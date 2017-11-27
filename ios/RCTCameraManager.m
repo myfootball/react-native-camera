@@ -841,6 +841,7 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
      @"width":[NSNumber numberWithFloat:videoWidth],
      @"height":[NSNumber numberWithFloat:videoHeight],
      @"size":[NSNumber numberWithLongLong:captureOutput.recordedFileSize],
+     @"startTime": [NSNumber numberWithDouble:self.startTime],
   }];
 
   if (self.videoTarget == RCTCameraCaptureTargetCameraRoll) {

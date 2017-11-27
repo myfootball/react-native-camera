@@ -432,6 +432,7 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
             case RCT_CAMERA_CAPTURE_TARGET_MEMORY:
                 byte[] encoded = convertFileToByteArray(mVideoFile);
                 response.putString("data", new String(encoded, Base64.DEFAULT));
+                response.putDouble("startTime", MRStartTime);
                 mRecordingPromise.resolve(response);
                 f.delete();
                 break;
@@ -456,11 +457,13 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
                 _reactContext.getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
                 addToMediaStore(mVideoFile.getAbsolutePath());
                 response.putString("path", Uri.fromFile(mVideoFile).toString());
+                response.putDouble("startTime", MRStartTime);
                 mRecordingPromise.resolve(response);
                 break;
             case RCT_CAMERA_CAPTURE_TARGET_TEMP:
             case RCT_CAMERA_CAPTURE_TARGET_DISK:
                 response.putString("path", Uri.fromFile(mVideoFile).toString());
+                response.putDouble("startTime", MRStartTime);
                 mRecordingPromise.resolve(response);
         }
 
