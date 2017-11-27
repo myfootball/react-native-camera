@@ -16,6 +16,7 @@ import android.util.Base64;
 import android.util.Log;
 import android.view.Surface;
 
+import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -26,6 +27,7 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeMap;
 
 import java.io.*;
+import java.lang.Long;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Date;
@@ -82,6 +84,7 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
     private Promise mRecordingPromise = null;
     private ReadableMap mRecordingOptions;
     private Boolean mSafeToCapture = true;
+    private Callback startRecordingCallback;
 
     public RCTCameraModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -357,6 +360,9 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
             mMediaRecorder.start();
             MRStartTime =  System.currentTimeMillis();
             mRecordingOptions = options;
+            if (startRecordingCallback instanceof Callback) {
+                startRecordingCallback.invoke(new Long(MRStartTime).doubleValue());
+            }
             mRecordingPromise = promise;  // only got here if mediaRecorder started
         } catch (Exception ex) {
             Log.e(TAG, "Media recorder start error.", ex);
@@ -647,6 +653,11 @@ public class RCTCameraModule extends ReactContextBaseJavaModule
                 break;
             }
         }
+    }
+
+    @ReactMethod
+    public void registerStartRecordingCallback(final Callback callback) {
+        startRecordingCallback = callback;
     }
 
     @ReactMethod
