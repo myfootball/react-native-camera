@@ -15,6 +15,8 @@
 
 @property (strong, nonatomic) RCTSensorOrientationChecker * sensorOrientationChecker;
 @property (assign, nonatomic) NSInteger* flashMode;
+@property (assign, nonatomic) double startTime;
+@property (nonatomic) RCTResponseSenderBlock startRecordingCallback;
 
 @end
 
@@ -377,6 +379,10 @@ RCT_EXPORT_METHOD(capture:(NSDictionary *)options
   else if (captureMode == RCTCameraCaptureModeVideo) {
     [self captureVideo:captureTarget options:options resolve:resolve reject:reject];
   }
+}
+
+RCT_EXPORT_METHOD(registerStartRecordingCallback:(RCTResponseSenderBlock)callback) {
+  self.startRecordingCallback = callback;
 }
 
 RCT_EXPORT_METHOD(stopCapture) {
@@ -784,7 +790,10 @@ RCT_EXPORT_METHOD(hasFlash:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRej
 
     //Start recording
     [self.movieFileOutput startRecordingToOutputFileURL:outputURL recordingDelegate:self];
-
+    self.startTime = ([[NSDate date] timeIntervalSince1970] * 1000);
+    if (self.startRecordingCallback) {
+      self.startRecordingCallback(@[[NSNumber numberWithDouble:self.startTime]]);
+    }
     self.videoResolve = resolve;
     self.videoReject = reject;
     self.videoTarget = target;
