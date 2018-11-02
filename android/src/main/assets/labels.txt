@@ -1,0 +1,5 @@
+person
+Soccerball
+little_hat
+big_hat
+Pole

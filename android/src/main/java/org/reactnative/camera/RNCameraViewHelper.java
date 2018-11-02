@@ -22,6 +22,9 @@ import org.reactnative.camera.events.*;
 import org.reactnative.camera.utils.ImageDimensions;
 import org.reactnative.barcodedetector.RNBarcodeDetector;
 import org.reactnative.facedetector.RNFaceDetector;
+import org.reactnative.videoanalyse.Classifier.Recognition;
+import org.reactnative.camera.events.VideoAnalyseDetectEvent;
+
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -230,6 +233,19 @@ public class RNCameraViewHelper {
     BarcodesDetectedEvent event = BarcodesDetectedEvent.obtain(
         view.getId(),
         barcodes
+    );
+
+    ReactContext reactContext = (ReactContext) view.getContext();
+    reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher().dispatchEvent(event);
+  }
+
+  public static void emitVideoAnalyseDetectedEvent(
+          ViewGroup view,
+          SparseArray<Recognition> boxes
+  ) {
+    VideoAnalyseDetectEvent event = VideoAnalyseDetectEvent.obtain(
+            view.getId(),
+            boxes
     );
 
     ReactContext reactContext = (ReactContext) view.getContext();
