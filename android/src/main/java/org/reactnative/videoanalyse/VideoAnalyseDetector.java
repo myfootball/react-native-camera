@@ -103,6 +103,7 @@ public class VideoAnalyseDetector implements Classifier{
     }
 
     public SparseArray<Recognition> detect(final Bitmap bitmap){
+        long time= System.currentTimeMillis();
         int lastScanline = (0+(bitmap.getHeight() - 1) * bitmap.getWidth());
         Log.e("Error","values                        =  "+ lastScanline + " w: " + bitmap.getWidth() + " l: " + intValues.length);
         Log.e("Error","offset <0                     =  " + false);
@@ -127,7 +128,7 @@ public class VideoAnalyseDetector implements Classifier{
                 }
             }
         }
-
+        Log.e("Error","Vertsirchene Zeit in detect<irgendwas mit Pixeln>: "+ (System.currentTimeMillis()- time));
         outputLocations = new float[1][NUM_DETECTIONS][4];
         outputClasses = new float[1][NUM_DETECTIONS];
         outputScores = new float[1][NUM_DETECTIONS];
@@ -139,9 +140,9 @@ public class VideoAnalyseDetector implements Classifier{
         outputMap.put(1, outputClasses);
         outputMap.put(2, outputScores);
         outputMap.put(3, numDetections);
-
+        Log.e("Error","Vertsirchene Zeit in detect<Direkt vor detect>: "+ (System.currentTimeMillis()- time));
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
-
+        Log.e("Error","Vertsirchene Zeit in detect<direkt nach detect>: "+ (System.currentTimeMillis()- time));
         SparseArray<Recognition> boxes = new SparseArray(NUM_DETECTIONS);
         for (int i = 0; i < NUM_DETECTIONS; ++i) {
             final RectF detection =
@@ -161,7 +162,7 @@ public class VideoAnalyseDetector implements Classifier{
                             detection));
         }
 
-
+        Log.e("Error","Vertsirchene Zeit in detect<am Ende>: "+ (System.currentTimeMillis()- time));
         return boxes;
     }
 

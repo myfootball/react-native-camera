@@ -14,6 +14,12 @@ import java.io.ByteArrayOutputStream;
 import android.graphics.YuvImage;
 import android.graphics.Rect;
 import android.graphics.ImageFormat;
+import android.graphics.Paint;
+import android.graphics.Paint.Style;
+import android.graphics.RectF;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import org.reactnative.videoanalyse.VideoAnalyseUtil;
 
 public class VideoAnalyseDetectorAsyncTask extends android.os.AsyncTask<Void, Void, SparseArray<Recognition>> {
     private byte[] mImageData;
@@ -42,43 +48,44 @@ public class VideoAnalyseDetectorAsyncTask extends android.os.AsyncTask<Void, Vo
         mVideoAnalyse = videoAnalyse;
     }
 
-    public static Bitmap convertCompressedByteArrayToBitmap(byte[] src){
-        return BitmapFactory.decodeByteArray(src, 0, src.length);
-    }
-
-    private static Bitmap toBitmap(byte[] data) {
-        try {
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(data);
-            Bitmap photo = BitmapFactory.decodeStream(inputStream);
-            inputStream.close();
-            return photo;
-        } catch (IOException e) {
-            throw new IllegalStateException("Will not happen", e);
-        }
-    }
-
-    private Bitmap toYuvBitmap(byte[] data){
-        YuvImage yuvImage = new YuvImage(data, ImageFormat.NV21, mWidth, mHeight, null);
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        yuvImage.compressToJpeg(new Rect(0, 0, mWidth, mHeight), 100, os);
-        byte[] jpegByteArray = os.toByteArray();
-        Bitmap bitmap = BitmapFactory.decodeByteArray(jpegByteArray, 0, jpegByteArray.length);
-        return Bitmap.createScaledBitmap(bitmap,300,300,false);
-    }
-
     @Override
     protected SparseArray<Recognition> doInBackground(Void... ignored){
+        long time= System.currentTimeMillis();
         if (isCancelled() || mDelegate == null || mVideoAnalyse == null) {
             return null;
         }
         Log.e("Error","byte image: "+ mImageData);
-        Bitmap frame = toYuvBitmap(mImageData);
+        Bitmap frame = VideoAnalyseUtil.toYuvBitmap(mImageData, mWidth, mHeight);
+        Log.e("Error","Vertsirchene Zeit<Bild>: "+ (System.currentTimeMillis()- time));
         Log.e("Error"," frame "+ frame);
         if (frame == null) {
             mDelegate.onVideoAnalyseTaskCompleted();
             return null;
         }
-        return mVideoAnalyse.detect(frame);
+        if(true){
+            SparseArray<Recognition> detections =  mVideoAnalyse.detect(frame);
+            Log.e("Error","Vertsirchene Zeit<Detection>: "+ (System.currentTimeMillis()- time));
+            return detections;
+        } else {
+            SparseArray<Recognition> detections = mVideoAnalyse.detect(frame);
+
+            Bitmap copyFrame = Bitmap.createBitmap(frame);
+            final Canvas canvas = new Canvas(copyFrame);
+            final Paint paint = new Paint();
+            paint.setColor(Color.RED);
+            paint.setStyle(Style.STROKE);
+            paint.setStrokeWidth(2.0f);
+
+            for (int i = 0; i < detections.size(); ++i){
+                Recognition recognition = detections.valueAt(i);
+                final RectF location = recognition.getLocation();
+                if (location != null) {
+                    canvas.drawRect(location,paint);
+                }
+            }
+
+            return detections;
+        }
     }
 
     @Override
