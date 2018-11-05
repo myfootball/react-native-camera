@@ -86,6 +86,7 @@ public class VideoAnalyseDetector implements Classifier{
 
         d.imgData = ByteBuffer.allocateDirect(1 * d.inputSize * d.inputSize * 3 * numBytesPerChannel);
         d.imgData.order(ByteOrder.nativeOrder());
+        d.intValues = new int[d.inputSize * d.inputSize];
 
         d.tfLite.setNumThreads(NUM_THREADS);
         d.outputLocations = new float[1][NUM_DETECTIONS][4];
@@ -102,6 +103,13 @@ public class VideoAnalyseDetector implements Classifier{
     }
 
     public SparseArray<Recognition> detect(final Bitmap bitmap){
+        int lastScanline = (0+(bitmap.getHeight() - 1) * bitmap.getWidth());
+        Log.e("Error","values                        =  "+ lastScanline + " w: " + bitmap.getWidth() + " l: " + intValues.length);
+        Log.e("Error","offset <0                     =  " + false);
+        Log.e("Error","offset + width > length       =  " + ((0+bitmap.getWidth()) > intValues.length));
+        Log.e("Error","lastscnaline < 0              =  " + (lastScanline < 0));
+        Log.e("Error","lastscanline + width > length =  " + (lastScanline + bitmap.getWidth() > intValues.length));
+        //               pixel   offset   stride          x  y      width             height
         bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
         imgData.rewind();
         for (int i = 0; i < inputSize; ++i){
@@ -142,6 +150,9 @@ public class VideoAnalyseDetector implements Classifier{
                             outputLocations[0][i][0] * inputSize,
                             outputLocations[0][i][3] * inputSize,
                             outputLocations[0][i][2] * inputSize);
+            Log.e("Error","number = "+ i );
+            Log.e("error"," outputclasses = " + ((int) outputClasses[0][i]) );
+            Log.e("Error"," labels "+ labels.get((int) outputClasses[0][i] + labelOffset));
             boxes.append(i,
                     new Recognition(
                             "" + i,

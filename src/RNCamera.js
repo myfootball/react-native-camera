@@ -48,6 +48,22 @@ type TrackedFaceFeature = FaceFeature & {
   faceID?: number,
 };
 
+type DetectedBoxFeature = BoxFeature & {
+    boxID?: number,
+};
+
+type BoxFeature = {
+  bounds: {
+    size: {
+      top: number,
+      left: number,
+      right: number,
+      bottom: number,
+    },
+    origin: Point,
+  },
+};
+
 type TrackedTextFeature = {
   type: string,
   bounds: {
@@ -98,6 +114,7 @@ type PropsType = typeof View.props & {
   autoFocusPointOfInterest?: { x: number, y: number },
   faceDetectionClassifications?: number,
   onFacesDetected?: ({ faces: Array<TrackedFaceFeature> }) => void,
+  onBoxesDetected?: ({ boxes: Array<DetectedBoxFeature> }) => void,
   onTextRecognized?: ({ textBlocks: Array<TrackedTextFeature> }) => void,
   captureAudio?: boolean,
   useCamera2Api?: boolean,
@@ -187,6 +204,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     onMountError: PropTypes.func,
     onCameraReady: PropTypes.func,
     onBarCodeRead: PropTypes.func,
+    onBoxesDetected: PropTypes.func,
     onPictureSaved: PropTypes.func,
     onGoogleVisionBarcodesDetected: PropTypes.func,
     onFacesDetected: PropTypes.func,
@@ -419,6 +437,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
           )}
           onBarCodeRead={this._onObjectDetected(this.props.onBarCodeRead)}
           onFacesDetected={this._onObjectDetected(this.props.onFacesDetected)}
+          onBoxesDetected={this._onObjectDetected(this.props.onBoxesDetected)}
           onTextRecognized={this._onObjectDetected(this.props.onTextRecognized)}
           onPictureSaved={this._onPictureSaved}
         >
