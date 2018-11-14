@@ -156,6 +156,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           new BarCodeScannerAsyncTask(delegate, mMultiFormatReader, data, width, height).execute();
         }
 
+
         if (willCallFaceTask) {
           faceDetectorTaskLock = true;
           FaceDetectorAsyncTaskDelegate delegate = (FaceDetectorAsyncTaskDelegate) cameraView;
