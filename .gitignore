@@ -43,6 +43,7 @@ buck-out/
 android/app/libs
 android/keystores/debug.keystore
 package-json.lock
+detect_inception.tflite
 
 # vscode
 .vscode
