@@ -31,6 +31,7 @@ import org.reactnative.videoanalyse.RNVideoAnalyse;
 import org.reactnative.camera.tasks.VideoAnalyseDetectorAsyncTaskDelegate;
 import org.reactnative.camera.tasks.VideoAnalyseDetectorAsyncTask;
 import org.reactnative.videoanalyse.Classifier.Recognition;
+import android.util.Log;
 
 import java.io.File;
 import java.io.IOException;
@@ -75,6 +76,10 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   private int mFaceDetectionClassifications = RNFaceDetector.NO_CLASSIFICATIONS;
   private int mGoogleVisionBarCodeType = Barcode.ALL_FORMATS;
   private int mGoogleVisionBarCodeMode = RNBarcodeDetector.NORMAL_MODE;
+
+  private int frameCounter = 0;
+  private int lastShot = -10;
+  private int analyseCounter = 0;
 
   public RNCameraView(ThemedReactContext themedReactContext) {
     super(themedReactContext, true);
@@ -128,13 +133,13 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
 
       @Override
       public void onFramePreview(CameraView cameraView, byte[] data, int width, int height, int rotation) {
-        Log.e("Error","test on Frame Preview");
+        frameCounter += 1;
         int correctRotation = RNCameraViewHelper.getCorrectCameraRotation(rotation, getFacing());
         boolean willCallBarCodeTask = mShouldScanBarCodes && !barCodeScannerTaskLock && cameraView instanceof BarCodeScannerAsyncTaskDelegate;
         boolean willCallFaceTask = mShouldDetectFaces && !faceDetectorTaskLock && cameraView instanceof FaceDetectorAsyncTaskDelegate;
         boolean willCallGoogleBarcodeTask = mShouldGoogleDetectBarcodes && !googleBarcodeDetectorTaskLock && cameraView instanceof BarcodeDetectorAsyncTaskDelegate;
         boolean willCallTextTask = mShouldRecognizeText && !textRecognizerTaskLock && cameraView instanceof TextRecognizerAsyncTaskDelegate;
-        boolean willCallVideoAnalyseTask = !videoAnalyseLock && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
+        boolean willCallVideoAnalyseTask = (frameCounter - lastShot >= 4) && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
         if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask) {
           return;
         }
@@ -174,6 +179,8 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         }
 
         if (willCallVideoAnalyseTask){
+          analyseCounter += 1;
+          lastShot = analyseCounter;
           videoAnalyseLock = true;
           VideoAnalyseDetectorAsyncTaskDelegate delegate = (VideoAnalyseDetectorAsyncTaskDelegate) cameraView;
           new VideoAnalyseDetectorAsyncTask(mVideoAnalyseDetector, delegate, data, width, height, correctRotation).execute();
@@ -184,6 +191,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           TextRecognizerAsyncTaskDelegate delegate = (TextRecognizerAsyncTaskDelegate) cameraView;
           new TextRecognizerAsyncTask(delegate, mTextRecognizer, data, width, height, correctRotation).execute();
         }
+        Log.e("Error","frames: "+frameCounter+ " analysed: " + analyseCounter + "  apf: "+ (frameCounter/analyseCounter));
       }
     });
     if (mVideoAnalyseDetector == null){
