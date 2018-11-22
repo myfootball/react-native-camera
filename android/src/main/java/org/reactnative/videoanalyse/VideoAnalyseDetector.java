@@ -72,6 +72,8 @@ public class VideoAnalyseDetector implements Classifier{
             br.close();
             d.inputSize = inputSize;
             d.tfLite = new Interpreter(loadModelFile(assetManager, modelFilename));
+            d.tfLite.setUseNNAPI(true);
+            //d.tfLite.setNumThreads(2);
         } catch (Exception e) {
             Log.e("Error","found an error");
             throw new RuntimeException(e);

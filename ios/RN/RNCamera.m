@@ -7,6 +7,7 @@
 #import <React/RCTUtils.h>
 #import <React/UIView+React.h>
 #import  "RNSensorOrientationChecker.h"
+#import <AssertMacros.h>
 @interface RNCamera ()
 
 @property (nonatomic, weak) RCTBridge *bridge;
@@ -1170,6 +1171,117 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
 
         _finishedReadingText = true;
     }
+
+    if (false) {
+        CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+        CFRetain(pixelBuffer);
+        [self runModelOnFrame:pixelBuffer];
+        CFRelease(pixelBuffer);
+    }
+}
+
+- (void) analyseFrame:(CVPixelBufferRef) pixelBuffer {
+        assert(pixelBuffer != NULL);
+
+      OSType sourcePixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
+      assert(sourcePixelFormat == kCVPixelFormatType_32ARGB ||
+             sourcePixelFormat == kCVPixelFormatType_32BGRA);
+
+      const int sourceRowBytes = (int)CVPixelBufferGetBytesPerRow(pixelBuffer);
+      const int image_width = (int)CVPixelBufferGetWidth(pixelBuffer);
+      const int fullHeight = (int)CVPixelBufferGetHeight(pixelBuffer);
+
+      CVPixelBufferLockFlags unlockFlags = kNilOptions;
+      CVPixelBufferLockBaseAddress(pixelBuffer, unlockFlags);
+
+      unsigned char* sourceBaseAddr = (unsigned char*)(CVPixelBufferGetBaseAddress(pixelBuffer));
+      int image_height;
+      unsigned char* sourceStartAddr;
+      if (fullHeight <= image_width) {
+        image_height = fullHeight;
+        sourceStartAddr = sourceBaseAddr;
+      } else {
+        image_height = image_width;
+        const int marginY = ((fullHeight - image_width) / 2);
+        sourceStartAddr = (sourceBaseAddr + (marginY * sourceRowBytes));
+      }
+      const int image_channels = 4;
+      assert(image_channels >= wanted_input_channels);
+      uint8_t* in = sourceStartAddr;
+
+      int input = interpreter->inputs()[0];
+      TfLiteTensor *input_tensor = interpreter->tensor(input);
+
+      bool is_quantized;
+      switch (input_tensor->type) {
+      case kTfLiteFloat32:
+        is_quantized = false;
+        break;
+      case kTfLiteUInt8:
+        is_quantized = true;
+        break;
+      default:
+        NSLog(@"Input data type is not supported by this demo app.");
+        return;
+      }
+
+      if (is_quantized) {
+        uint8_t* out = interpreter->typed_tensor<uint8_t>(input);
+        ProcessInputWithQuantizedModel(in, out, image_width, image_height, image_channels);
+      } else {
+        float* out = interpreter->typed_tensor<float>(input);
+        ProcessInputWithFloatModel(in, out, image_width, image_height, image_channels);
+      }
+
+      double start = [[NSDate new] timeIntervalSince1970];
+      if (interpreter->Invoke() != kTfLiteOk) {
+        LOG(FATAL) << "Failed to invoke!";
+      }
+      double end = [[NSDate new] timeIntervalSince1970];
+      total_latency += (end - start);
+      total_count += 1;
+      NSLog(@"Time: %.4lf, avg: %.4lf, count: %d", end - start, total_latency / total_count,
+            total_count);
+
+      const int output_size = 1000;
+      const int kNumResults = 5;
+      const float kThreshold = 0.1f;
+
+      std::vector<std::pair<float, int> > top_results;
+
+      if (is_quantized) {
+        uint8_t* quantized_output = interpreter->typed_output_tensor<uint8_t>(0);
+        int32_t zero_point = input_tensor->params.zero_point;
+        float scale = input_tensor->params.scale;
+        float output[output_size];
+        for (int i = 0; i < output_size; ++i) {
+          output[i] = (quantized_output[i] - zero_point) * scale;
+        }
+        GetTopN(output, output_size, kNumResults, kThreshold, &top_results);
+      } else {
+        float* output = interpreter->typed_output_tensor<float>(0);
+        GetTopN(output, output_size, kNumResults, kThreshold, &top_results);
+      }
+      /*
+            From this point on change something to access the output
+            Need changes in the if else above also, to also load
+            the boxes
+      */
+
+      NSMutableDictionary* newValues = [NSMutableDictionary dictionary];
+      for (const auto& result : top_results) {
+        const float confidence = result.first;
+        const int index = result.second;
+        NSString* labelObject = [NSString stringWithUTF8String:labels[index].c_str()];
+        NSNumber* valueObject = [NSNumber numberWithFloat:confidence];
+        [newValues setObject:valueObject forKey:labelObject];
+      }
+      dispatch_async(dispatch_get_main_queue(), ^(void) {
+        [self setPredictionValues:newValues];
+      });
+
+      CVPixelBufferUnlockBaseAddress(pixelBuffer, unlockFlags);
+      CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
 }
 
 - (void)stopTextRecognition
