@@ -18,7 +18,7 @@ public class RNVideoAnalyse{
     private Context mContext;
 
     private static final int TF_OD_API_INPUT_SIZE = 300;
-    private static final String TF_OD_API_MODEL_FILE = "detect.tflite";
+    private static final String TF_OD_API_MODEL_FILE = "mob_quant_v1.tflite";
     private static final String TF_OD_API_LABELS_FILE = "labels.txt";
 
     public RNVideoAnalyse(Context context){
@@ -38,17 +38,26 @@ public class RNVideoAnalyse{
         return mVideoAnaylseDetector.isOperational();
     }
 
-    public SparseArray<Recognition> detect(Bitmap frame) {
+    public SparseArray<Recognition> detect(Bitmap frame, int mHeigth, int mWidth) {
         if (mVideoAnaylseDetector == null){
             createVideoAnalyseDetector();
             //mPreviousDimensions = frame.getDimensions();
         }
 
-        return mVideoAnaylseDetector.detect(frame);
+        return mVideoAnaylseDetector.detect(frame, mHeigth, mWidth);
     }
 
     private void createVideoAnalyseDetector(){
         mVideoAnaylseDetector = (VideoAnalyseDetector) mDecoder.create(TF_OD_API_LABELS_FILE,TF_OD_API_INPUT_SIZE,mContext.getAssets(),TF_OD_API_MODEL_FILE);
+    }
+
+
+    public void setGPU(boolean gpu){
+        mVideoAnaylseDetector.setGPU(gpu);
+    }
+
+    public void setNNAPI(boolean nnapi){
+        mVideoAnaylseDetector.setNNAPI(nnapi);
     }
 
 

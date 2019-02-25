@@ -21,13 +21,17 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import org.reactnative.videoanalyse.VideoAnalyseUtil;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import android.os.Environment;
+
 public class VideoAnalyseDetectorAsyncTask extends android.os.AsyncTask<Void, Void, SparseArray<Recognition>> {
     private byte[] mImageData;
     private int mWidth;
     private int mHeight;
     private int mRotation;
     public static int counter = 0;
-
+    public static boolean takePicture = true;
     private RNVideoAnalyse mVideoAnalyse;
     private VideoAnalyseDetectorAsyncTaskDelegate mDelegate;
 
@@ -48,26 +52,68 @@ public class VideoAnalyseDetectorAsyncTask extends android.os.AsyncTask<Void, Vo
         mVideoAnalyse = videoAnalyse;
     }
 
+    public void saveBitmap(Bitmap bitmap, String name){
+        long time= System.currentTimeMillis();
+        if(bitmap!=null){
+            String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/Testfolder";
+            File dir = new File(path);
+            if(!dir.exists())
+                dir.mkdirs();
+            File file = new File(dir,name);
+            try {
+                FileOutputStream outputStream = null;
+                try {
+                    outputStream = new FileOutputStream(file);
+
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                } catch (Exception e) {
+                    Log.e("Error","found an error at save picture");
+                    Log.e("Error",e.toString());
+                    e.printStackTrace();
+                } finally {
+                    try {
+                        if (outputStream != null) {
+                            outputStream.close();
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        Log.e("Error","Zeit für Bild speichern: "+ (System.currentTimeMillis()- time));
+    }
+
     @Override
     protected SparseArray<Recognition> doInBackground(Void... ignored){
         long time= System.currentTimeMillis();
+        Log.e("Error Benny","what ist happening here"+isCancelled()+ " " + mDelegate + " " + mVideoAnalyse);
         if (isCancelled() || mDelegate == null || mVideoAnalyse == null) {
             return null;
         }
-        Log.e("Error","byte image: "+ mImageData);
+        //Log.e("Error","width and height"+mWidth+" "+mHeight);
+        //Log.e("Error","byte image: "+ mImageData);
+        Log.e("Error","Verstrichene Zeit<vor toyuvBild>: "+ (System.currentTimeMillis()- time));
         Bitmap frame = VideoAnalyseUtil.toYuvBitmap(mImageData, mWidth, mHeight);
-        Log.e("Error","Vertsirchene Zeit<Bild>: "+ (System.currentTimeMillis()- time));
-        Log.e("Error"," frame "+ frame);
+        Log.e("Error","Verstrichene Zeit<nach toyuvBild>: "+ (System.currentTimeMillis()- time));
         if (frame == null) {
             mDelegate.onVideoAnalyseTaskCompleted();
             return null;
         }
         if(true){
-            SparseArray<Recognition> detections =  mVideoAnalyse.detect(frame);
-            Log.e("Error","Vertsirchene Zeit<Detection>: "+ (System.currentTimeMillis()- time));
-            return detections;
+//            try {
+                Log.e("Error", "Verstrichene Zeit<vor Detection>: " + (System.currentTimeMillis() - time));
+                SparseArray<Recognition> detections = mVideoAnalyse.detect(frame, mHeight, mWidth);
+                Log.e("Error", "Verstrichene Zeit<nach Detection>: " + (System.currentTimeMillis() - time));
+                return detections;
+ //           } catch (Exception e){
+ //               Log.e("Error", "Detections failed errormessage: " + e);
+ //               return new SparseArray<Recognition>();
+//            }
         } else {
-            SparseArray<Recognition> detections = mVideoAnalyse.detect(frame);
+            SparseArray<Recognition> detections = mVideoAnalyse.detect(frame, mHeight, mWidth);
 
             Bitmap copyFrame = Bitmap.createBitmap(frame);
             final Canvas canvas = new Canvas(copyFrame);

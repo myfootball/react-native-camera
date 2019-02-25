@@ -287,6 +287,8 @@ export default class Camera extends React.Component<PropsType, StateType> {
     ...ViewPropTypes,
     zoom: PropTypes.number,
     ratio: PropTypes.string,
+    gpu: PropTypes.bool,
+    nnapi: PropTypes.bool,
     focusDepth: PropTypes.number,
     onMountError: PropTypes.func,
     onCameraReady: PropTypes.func,
@@ -324,6 +326,8 @@ export default class Camera extends React.Component<PropsType, StateType> {
   static defaultProps: Object = {
     zoom: 0,
     ratio: '4:3',
+    gpu: false,
+    nnapi: false,
     focusDepth: 0,
     type: CameraManager.Type.back,
     autoFocus: CameraManager.AutoFocus.on,

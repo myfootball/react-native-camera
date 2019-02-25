@@ -141,11 +141,13 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         boolean willCallFaceTask = mShouldDetectFaces && !faceDetectorTaskLock && cameraView instanceof FaceDetectorAsyncTaskDelegate;
         boolean willCallGoogleBarcodeTask = mShouldGoogleDetectBarcodes && !googleBarcodeDetectorTaskLock && cameraView instanceof BarcodeDetectorAsyncTaskDelegate;
         boolean willCallTextTask = mShouldRecognizeText && !textRecognizerTaskLock && cameraView instanceof TextRecognizerAsyncTaskDelegate;
-        boolean willCallVideoAnalyseTask = (frameCounter - lastShot >= 4) && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
-        if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask) {
+        boolean willCallVideoAnalyseTask = (frameCounter - lastShot >= 4) && !videoAnalyseLock && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
+        Log.e("Error Benjamin","framePreview"+willCallVideoAnalyseTask);
+        Log.e("Error Benny","what happens here "+ willCallBarCodeTask + " " + willCallFaceTask + " " + willCallGoogleBarcodeTask+ " " + willCallTextTask);
+        if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask && !willCallVideoAnalyseTask) {
           return;
         }
-
+        Log.e("Error Benny","what happens here " + (data.length < (1.5 * width * height)));
         if (data.length < (1.5 * width * height)) {
             return;
         }
@@ -186,6 +188,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           lastShot = analyseCounter;
           videoAnalyseLock = true;
           VideoAnalyseDetectorAsyncTaskDelegate delegate = (VideoAnalyseDetectorAsyncTaskDelegate) cameraView;
+          Log.e("Error Benny","Call videoanalyse");
           new VideoAnalyseDetectorAsyncTask(mVideoAnalyseDetector, delegate, data, width, height, correctRotation).execute();
         }
 
@@ -433,6 +436,14 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     mVideoAnalyseDetector = new RNVideoAnalyse(mThemedReactContext);
   }
 
+  public void setGPU(boolean gpu){
+      mVideoAnalyseDetector.setGPU(gpu);
+  }
+
+  public void setNNAPI(boolean nnapi){
+      mVideoAnalyseDetector.setNNAPI(nnapi);
+  }
+
   /**
    * Initial setup of the barcode detector
    */
@@ -492,6 +503,8 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     SparseArray<Recognition> detectedBoxes = recognition == null ? new SparseArray<Recognition>() : recognition;
 
     RNCameraViewHelper.emitVideoAnalyseDetectedEvent(this, detectedBoxes);
+
+
   }
 
   @Override

@@ -156,9 +156,13 @@ export default class Camera extends Component {
     permissionDialogMessage: PropTypes.string,
     notAuthorizedView: PropTypes.element,
     pendingAuthorizationView: PropTypes.element,
+    gpu: PropTypes.bool,
+    nnapi: PropTypes.bool,
   };
 
   static defaultProps = {
+    gpu: false,
+    nnapi: false,
     aspect: CameraManager.Aspect.fill,
     type: CameraManager.Type.back,
     orientation: CameraManager.Orientation.auto,

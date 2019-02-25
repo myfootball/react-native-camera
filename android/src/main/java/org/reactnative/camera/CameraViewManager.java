@@ -68,6 +68,12 @@ public class CameraViewManager extends ViewGroupManager<RNCameraView> {
     return builder.build();
   }
 
+  @ReactProp(name = "nnapi")
+  public void setNNAPI(RNCameraView view, boolean nnapi) { view.setNNAPI(nnapi);}
+
+  @ReactProp(name = "gpu")
+  public void setGPU(RNCameraView view, boolean gpu) { view.setGPU(gpu);}
+
   @ReactProp(name = "type")
   public void setType(RNCameraView view, int type) {
     view.setFacing(type);

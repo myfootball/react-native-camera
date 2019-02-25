@@ -13,16 +13,22 @@ import java.io.InputStreamReader;
 import java.util.Vector;
 import java.nio.channels.FileChannel;
 import java.io.IOException;
+import java.io.File;
+import java.io.FileOutputStream;
+
 import java.nio.MappedByteBuffer;
 import java.util.List;
 import android.graphics.Bitmap;
 import android.util.SparseArray;
 import android.util.Log;
 import android.graphics.RectF;
+import android.os.Environment;
 import java.util.HashMap;
 import java.util.Map;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+
+import org.tensorflow.lite.Delegate;
 
 public class VideoAnalyseDetector implements Classifier{
     private int inputSize;
@@ -39,9 +45,55 @@ public class VideoAnalyseDetector implements Classifier{
     int labelOffset = 1;
     private static final float IMAGE_MEAN = 128.0f;
     private static final float IMAGE_STD = 128.0f;
+    private boolean isGPU = false;
+    private boolean isInterpreterRecreated = false;
+
+    private MappedByteBuffer loadedModel = null;
+
+    private boolean quant = true;
+
+
+    private Delegate gpuDelegate = null;
+    private Interpreter.Options tfoptions =  new Interpreter.Options();
+
+    public static boolean takePicture = true;
 
     public VideoAnalyseDetector (){
+        tfoptions = new Interpreter.Options();
+    }
 
+    public void saveBitmap(Bitmap bitmap, String name){
+        long time= System.currentTimeMillis();
+        if(bitmap!=null){
+            String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/Testfolder";
+            File dir = new File(path);
+            if(!dir.exists())
+                dir.mkdirs();
+            File file = new File(dir,name);
+            try {
+                FileOutputStream outputStream = null;
+                try {
+                    outputStream = new FileOutputStream(file);
+
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                } catch (Exception e) {
+                    Log.e("Error","found an error at save picture");
+                    Log.e("Error",e.toString());
+                    e.printStackTrace();
+                } finally {
+                    try {
+                        if (outputStream != null) {
+                            outputStream.close();
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        Log.e("Error","Zeit für Bild speichern: "+ (System.currentTimeMillis()- time));
     }
 
     /** Memory-map the model file in Assets. */
@@ -58,9 +110,13 @@ public class VideoAnalyseDetector implements Classifier{
     public static Classifier create(final String labelNames, final int inputSize,
                                     final AssetManager assetManager,
                                     final String modelFilename){
+        Log.e("ReCreate"," hm how often ist this method called?");
         final VideoAnalyseDetector d = new VideoAnalyseDetector();
         InputStream labelsInput = null;
         try {
+            if(d.tfoptions == null){
+                d.tfoptions = new Interpreter.Options();
+            }
             String actualFilename = labelNames;
             labelsInput = assetManager.open(actualFilename);
             BufferedReader br = null;
@@ -71,16 +127,18 @@ public class VideoAnalyseDetector implements Classifier{
             }
             br.close();
             d.inputSize = inputSize;
-            d.tfLite = new Interpreter(loadModelFile(assetManager, modelFilename));
-            d.tfLite.setUseNNAPI(true);
-            //d.tfLite.setNumThreads(2);
+            d.loadedModel = loadModelFile(assetManager, modelFilename);
+            //d.tfoptions.setNumThreads(4);
+            d.tfLite = new Interpreter(d.loadedModel,d.tfoptions);//,options);
+            //d.tfLite.setUseNNAPI(false); // Error with inception net
+            d.tfLite.setNumThreads(4);
         } catch (Exception e) {
             Log.e("Error","found an error");
             throw new RuntimeException(e);
         }
 
         int numBytesPerChannel;
-        if (false) {
+        if (d.quant) {
             numBytesPerChannel = 1; // Quantized
         } else {
             numBytesPerChannel = 4; // Floating point
@@ -104,21 +162,15 @@ public class VideoAnalyseDetector implements Classifier{
         return true;
     }
 
-    public SparseArray<Recognition> detect(final Bitmap bitmap){
+    public SparseArray<Recognition> detect(final Bitmap bitmap, int mHeigth, int mWidth){
         long time= System.currentTimeMillis();
         int lastScanline = (0+(bitmap.getHeight() - 1) * bitmap.getWidth());
-        Log.e("Error","values                        =  "+ lastScanline + " w: " + bitmap.getWidth() + " l: " + intValues.length);
-        Log.e("Error","offset <0                     =  " + false);
-        Log.e("Error","offset + width > length       =  " + ((0+bitmap.getWidth()) > intValues.length));
-        Log.e("Error","lastscnaline < 0              =  " + (lastScanline < 0));
-        Log.e("Error","lastscanline + width > length =  " + (lastScanline + bitmap.getWidth() > intValues.length));
-        //               pixel   offset   stride          x  y      width             height
         bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
         imgData.rewind();
         for (int i = 0; i < inputSize; ++i){
             for (int j = 0; j < inputSize; ++j){
                 int pixelValue = intValues[i*inputSize+j];
-                if (false) {
+                if (quant) {
                     // Quantized model
                     imgData.put((byte) ((pixelValue >> 16) & 0xFF));
                     imgData.put((byte) ((pixelValue >> 8) & 0xFF));
@@ -130,7 +182,7 @@ public class VideoAnalyseDetector implements Classifier{
                 }
             }
         }
-        Log.e("Error","Vertsirchene Zeit in detect<irgendwas mit Pixeln>: "+ (System.currentTimeMillis()- time));
+        Log.e("##Error","Verstrichene Zeit in detect<irgendwas mit Pixeln>: "+ (System.currentTimeMillis()- time));
         outputLocations = new float[1][NUM_DETECTIONS][4];
         outputClasses = new float[1][NUM_DETECTIONS];
         outputScores = new float[1][NUM_DETECTIONS];
@@ -142,35 +194,83 @@ public class VideoAnalyseDetector implements Classifier{
         outputMap.put(1, outputClasses);
         outputMap.put(2, outputScores);
         outputMap.put(3, numDetections);
-        Log.e("Error","Vertsirchene Zeit in detect<Direkt vor detect>: "+ (System.currentTimeMillis()- time));
+        Log.e("GPU","gpu "+isGPU + " " + isInterpreterRecreated);
+        if(isGPU && !isInterpreterRecreated){
+            isInterpreterRecreated = true;
+            setGPUProcess();
+            Log.e("##Error","Verstrichene Zeit in detect<Direkt vor recreate Interpreter for GPU>: "+ (System.currentTimeMillis()- time));
+            recreateInterpreter();
+            Log.e("##Error","Verstrichene Zeit in detect<direkt nach recreate Interpreter for GPU>: "+ (System.currentTimeMillis()- time));
+        }
+        Log.e("##Error","Verstrichene Zeit in detect<Direkt vor detect>: "+ (System.currentTimeMillis()- time));
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
-        Log.e("Error","Vertsirchene Zeit in detect<direkt nach detect>: "+ (System.currentTimeMillis()- time));
+        Log.e("##Error","Verstrichene Zeit in detect<direkt nach detect>: "+ (System.currentTimeMillis()- time));
         SparseArray<Recognition> boxes = new SparseArray(NUM_DETECTIONS);
+        int heigth = 330;
+        int width = 690;
         for (int i = 0; i < NUM_DETECTIONS; ++i) {
             final RectF detection =
                     new RectF(
-                            outputLocations[0][i][1] * inputSize,
-                            outputLocations[0][i][0] * inputSize,
-                            outputLocations[0][i][3] * inputSize,
-                            outputLocations[0][i][2] * inputSize);
-            Log.e("Error","number = "+ i );
-            Log.e("error"," outputclasses = " + ((int) outputClasses[0][i]) );
-            Log.e("Error"," labels "+ labels.get((int) outputClasses[0][i] + labelOffset));
-            boxes.append(i,
-                    new Recognition(
-                            "" + i,
-                            labels.get((int) outputClasses[0][i] + labelOffset),
-                            outputScores[0][i],
-                            detection));
+                            outputLocations[0][i][1] * inputSize * (width/inputSize),
+                            outputLocations[0][i][0] * inputSize * (heigth/inputSize),
+                            outputLocations[0][i][3] * inputSize * (width/inputSize),
+                            outputLocations[0][i][2] * inputSize * (heigth/inputSize));
+//            Log.e("Error","number = "+ i );
+//            Log.e("error"," outputclasses = " + (outputClasses[0]) );
+//            Log.e("error"," outputclasses = " + ((int) outputClasses[0][i]) );
+            if (((int) outputClasses[0][i]) < 0){
+
+            } else{
+//                Log.e("Error", " labels " + labels.get((int) outputClasses[0][i] + labelOffset));
+                boxes.append(i,
+                        new Recognition(
+                                "" + i,
+                                labels.get((int) outputClasses[0][i] + labelOffset),
+                                outputScores[0][i],
+                                detection));
+            }
         }
 
-        Log.e("Error","Vertsirchene Zeit in detect<am Ende>: "+ (System.currentTimeMillis()- time));
+        Log.e("##Error","Verstrichene Zeit in detect<am Ende>: "+ (System.currentTimeMillis()- time));
         return boxes;
+    }
+
+    private void recreateInterpreter() {
+
+        if (tfLite != null && loadedModel != null && tfoptions != null) {
+            Log.e("Error"," recreacting teflite interpreter "+ tfoptions);
+            tfLite.close();
+            tfLite = new Interpreter(loadedModel, tfoptions);
+            tfLite.setNumThreads(4);
+        } else {
+            Log.e("Error"," at recreating model tflite:"+ tfLite+" loadedModel:"+loadedModel+" options:"+tfoptions);
+        }
     }
 
     public void close(){
 
     }
+
+    private void setGPUProcess(){
+        if (gpuDelegate == null && GpuDelegateHelper.isGpuDelegateAvailable()) {
+            gpuDelegate = GpuDelegateHelper.createGpuDelegate();
+            tfoptions.addDelegate(gpuDelegate);
+        }
+    }
+
+    public void setGPU(boolean gpu){
+        Log.e("GPU","Set GPU "+ gpu);
+        isGPU = gpu;
+        isInterpreterRecreated = !gpu;
+
+    }
+
+    public void setNNAPI(boolean nnapi){
+        Log.e("NNAPI", "setNNAPI "+ nnapi);
+        tfoptions.setUseNNAPI(nnapi);
+        recreateInterpreter();
+    }
+
 
     public String getStatString() {
         return "";
