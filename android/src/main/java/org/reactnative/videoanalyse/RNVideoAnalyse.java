@@ -18,7 +18,7 @@ public class RNVideoAnalyse{
     private Context mContext;
 
     private static final int TF_OD_API_INPUT_SIZE = 300;
-    private static final String TF_OD_API_MODEL_FILE = "mob_quant_v1.tflite";
+    private static final String TF_OD_API_MODEL_FILE = "ssd_mob_v2_quant.tflite";
     private static final String TF_OD_API_LABELS_FILE = "labels.txt";
 
     public RNVideoAnalyse(Context context){

@@ -134,6 +134,12 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
       }
 
       @Override
+      public void onFramePreview(CameraView cameraView, byte[] data, int width, int height) {
+          Log.e("print me something","fast");
+          Log.e("print me something"," "+data);
+      }
+
+      @Override
       public void onFramePreview(CameraView cameraView, byte[] data, int width, int height, int rotation) {
         frameCounter += 1;
         int correctRotation = RNCameraViewHelper.getCorrectCameraRotation(rotation, getFacing(), getCameraOrientation());
@@ -142,12 +148,9 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         boolean willCallGoogleBarcodeTask = mShouldGoogleDetectBarcodes && !googleBarcodeDetectorTaskLock && cameraView instanceof BarcodeDetectorAsyncTaskDelegate;
         boolean willCallTextTask = mShouldRecognizeText && !textRecognizerTaskLock && cameraView instanceof TextRecognizerAsyncTaskDelegate;
         boolean willCallVideoAnalyseTask = (frameCounter - lastShot >= 4) && !videoAnalyseLock && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
-        Log.e("Error Benjamin","framePreview"+willCallVideoAnalyseTask);
-        Log.e("Error Benny","what happens here "+ willCallBarCodeTask + " " + willCallFaceTask + " " + willCallGoogleBarcodeTask+ " " + willCallTextTask);
         if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask && !willCallVideoAnalyseTask) {
           return;
         }
-        Log.e("Error Benny","what happens here " + (data.length < (1.5 * width * height)));
         if (data.length < (1.5 * width * height)) {
             return;
         }
@@ -188,7 +191,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           lastShot = analyseCounter;
           videoAnalyseLock = true;
           VideoAnalyseDetectorAsyncTaskDelegate delegate = (VideoAnalyseDetectorAsyncTaskDelegate) cameraView;
-          Log.e("Error Benny","Call videoanalyse");
           new VideoAnalyseDetectorAsyncTask(mVideoAnalyseDetector, delegate, data, width, height, correctRotation).execute();
         }
 
@@ -197,7 +199,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           TextRecognizerAsyncTaskDelegate delegate = (TextRecognizerAsyncTaskDelegate) cameraView;
           new TextRecognizerAsyncTask(delegate, mTextRecognizer, data, width, height, correctRotation).execute();
         }
-        Log.e("Error","frames: "+frameCounter+ " analysed: " + analyseCounter + "  apf: "+ (frameCounter/analyseCounter));
       }
     });
     if (mVideoAnalyseDetector == null){

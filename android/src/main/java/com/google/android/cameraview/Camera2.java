@@ -178,8 +178,10 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
                     byte[] data = new byte[buffer.remaining()];
                     buffer.get(data);
                     if (image.getFormat() == ImageFormat.JPEG) {
-                        // @TODO: implement deviceOrientation
-                        mCallback.onPictureTaken(data, 0);
+                        mCallback.onPictureTaken(data,0);
+                    }
+                    else if (image.getFormat() == ImageFormat.FLEX_RGBA_8888){
+                        mCallback.onFramePreview(data,image.getWidth(),image.getHeight());
                     } else {
                         mCallback.onFramePreview(data, image.getWidth(), image.getHeight(), mDisplayOrientation);
                     }
@@ -204,6 +206,8 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
     Set<String> mAvailableCameras = new HashSet<>();
 
     private ImageReader mStillImageReader;
+
+    private ImageReader mScannImages;
 
     private ImageReader mScanImageReader;
 
@@ -290,6 +294,7 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
         mInitialRatio = null;
         prepareStillImageReader();
         prepareScanImageReader();
+        prepareScanImageRBG();
         startOpeningCamera();
         return true;
     }
@@ -307,6 +312,10 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
         if (mStillImageReader != null) {
             mStillImageReader.close();
             mStillImageReader = null;
+        }
+        if (mScannImages != null){
+            mScannImages.close();
+            mScannImages = null;
         }
 
         if (mScanImageReader != null) {
@@ -374,10 +383,14 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
         if (mStillImageReader != null) {
             mStillImageReader.close();
         }
+        if(mScannImages != null){
+            mScannImages.close();
+        }
         if (size == null) {
           if (mAspectRatio == null) {
             return;
           }
+          Log.e("...","m "+mPictureSizes + " "+ mPictureSizes.ratios());
           mPictureSizes.sizes(mAspectRatio).last();
         } else {
           mPictureSize = size;
@@ -405,6 +418,7 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
         mAspectRatio = ratio;
         prepareStillImageReader();
         prepareScanImageReader();
+        prepareScanImageRBG();
         if (mCaptureSession != null) {
             mCaptureSession.close();
             mCaptureSession = null;
@@ -752,6 +766,16 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
         mScanImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
                 ImageFormat.YUV_420_888, 1);
         mScanImageReader.setOnImageAvailableListener(mOnImageAvailableListener, null);
+    }
+
+    private void prepareScanImageRBG() {
+        if (mScannImages != null) {
+            mScannImages.close();
+        }
+        Size largest = mPreviewSizes.sizes(mAspectRatio).last();
+        mScannImages = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
+                ImageFormat.FLEX_RGBA_8888, 1);
+        mScannImages.setOnImageAvailableListener(mOnImageAvailableListener, null);
     }
 
     /**

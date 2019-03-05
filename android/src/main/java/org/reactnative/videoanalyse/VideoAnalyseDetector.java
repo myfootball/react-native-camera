@@ -1,8 +1,5 @@
 package org.reactnative.videoanalyse;
 
-import android.content.Context;
-import org.reactnative.videoanalyse.Classifier;
-import org.reactnative.videoanalyse.Classifier.Recognition;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import java.io.BufferedReader;
@@ -13,8 +10,6 @@ import java.io.InputStreamReader;
 import java.util.Vector;
 import java.nio.channels.FileChannel;
 import java.io.IOException;
-import java.io.File;
-import java.io.FileOutputStream;
 
 import java.nio.MappedByteBuffer;
 import java.util.List;
@@ -22,7 +17,6 @@ import android.graphics.Bitmap;
 import android.util.SparseArray;
 import android.util.Log;
 import android.graphics.RectF;
-import android.os.Environment;
 import java.util.HashMap;
 import java.util.Map;
 import java.nio.ByteBuffer;
@@ -56,44 +50,9 @@ public class VideoAnalyseDetector implements Classifier{
     private Delegate gpuDelegate = null;
     private Interpreter.Options tfoptions =  new Interpreter.Options();
 
-    public static boolean takePicture = true;
 
     public VideoAnalyseDetector (){
         tfoptions = new Interpreter.Options();
-    }
-
-    public void saveBitmap(Bitmap bitmap, String name){
-        long time= System.currentTimeMillis();
-        if(bitmap!=null){
-            String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/Testfolder";
-            File dir = new File(path);
-            if(!dir.exists())
-                dir.mkdirs();
-            File file = new File(dir,name);
-            try {
-                FileOutputStream outputStream = null;
-                try {
-                    outputStream = new FileOutputStream(file);
-
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-                } catch (Exception e) {
-                    Log.e("Error","found an error at save picture");
-                    Log.e("Error",e.toString());
-                    e.printStackTrace();
-                } finally {
-                    try {
-                        if (outputStream != null) {
-                            outputStream.close();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        Log.e("Error","Zeit für Bild speichern: "+ (System.currentTimeMillis()- time));
     }
 
     /** Memory-map the model file in Assets. */
@@ -110,7 +69,6 @@ public class VideoAnalyseDetector implements Classifier{
     public static Classifier create(final String labelNames, final int inputSize,
                                     final AssetManager assetManager,
                                     final String modelFilename){
-        Log.e("ReCreate"," hm how often ist this method called?");
         final VideoAnalyseDetector d = new VideoAnalyseDetector();
         InputStream labelsInput = null;
         try {
@@ -153,8 +111,6 @@ public class VideoAnalyseDetector implements Classifier{
         d.outputClasses = new float[1][NUM_DETECTIONS];
         d.outputScores = new float[1][NUM_DETECTIONS];
         d.numDetections = new float[1];
-
-        Log.e("Error","Created something with loaded model");
         return d;
     }
 
@@ -215,13 +171,9 @@ public class VideoAnalyseDetector implements Classifier{
                             outputLocations[0][i][0] * inputSize * (heigth/inputSize),
                             outputLocations[0][i][3] * inputSize * (width/inputSize),
                             outputLocations[0][i][2] * inputSize * (heigth/inputSize));
-//            Log.e("Error","number = "+ i );
-//            Log.e("error"," outputclasses = " + (outputClasses[0]) );
-//            Log.e("error"," outputclasses = " + ((int) outputClasses[0][i]) );
             if (((int) outputClasses[0][i]) < 0){
 
             } else{
-//                Log.e("Error", " labels " + labels.get((int) outputClasses[0][i] + labelOffset));
                 boxes.append(i,
                         new Recognition(
                                 "" + i,
