@@ -142,18 +142,23 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
       @Override
       public void onFramePreview(CameraView cameraView, byte[] data, int width, int height, int rotation) {
         frameCounter += 1;
+        Log.e("traaaa","onFramePreview");
         int correctRotation = RNCameraViewHelper.getCorrectCameraRotation(rotation, getFacing(), getCameraOrientation());
         boolean willCallBarCodeTask = mShouldScanBarCodes && !barCodeScannerTaskLock && cameraView instanceof BarCodeScannerAsyncTaskDelegate;
         boolean willCallFaceTask = mShouldDetectFaces && !faceDetectorTaskLock && cameraView instanceof FaceDetectorAsyncTaskDelegate;
         boolean willCallGoogleBarcodeTask = mShouldGoogleDetectBarcodes && !googleBarcodeDetectorTaskLock && cameraView instanceof BarcodeDetectorAsyncTaskDelegate;
         boolean willCallTextTask = mShouldRecognizeText && !textRecognizerTaskLock && cameraView instanceof TextRecognizerAsyncTaskDelegate;
         boolean willCallVideoAnalyseTask = (frameCounter - lastShot >= 4) && !videoAnalyseLock && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
+
+        Log.e("error","video analyse task "+ willCallVideoAnalyseTask);
         if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask && !willCallVideoAnalyseTask) {
           return;
         }
+          Log.e("error","video vor data "+data.length + " "+width+" "+height + " "+ (1.5*width*height));
         if (data.length < (1.5 * width * height)) {
             return;
         }
+        Log.e("error","video nach data");
 
         if (willCallBarCodeTask) {
           barCodeScannerTaskLock = true;
@@ -185,6 +190,8 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           BarcodeDetectorAsyncTaskDelegate delegate = (BarcodeDetectorAsyncTaskDelegate) cameraView;
           new BarcodeDetectorAsyncTask(delegate, mGoogleBarcodeDetector, data, width, height, correctRotation).execute();
         }
+
+        Log.e("error","video analyse task "+ willCallVideoAnalyseTask);
 
         if (willCallVideoAnalyseTask){
           analyseCounter += 1;

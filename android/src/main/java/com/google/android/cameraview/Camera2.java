@@ -171,6 +171,7 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
 
         @Override
         public void onImageAvailable(ImageReader reader) {
+            Log.e("hmmmmm","where do i go? ");
             try (Image image = reader.acquireNextImage()) {
                 Image.Plane[] planes = image.getPlanes();
                 if (planes.length > 0) {
@@ -178,11 +179,14 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
                     byte[] data = new byte[buffer.remaining()];
                     buffer.get(data);
                     if (image.getFormat() == ImageFormat.JPEG) {
+                        Log.e("joooo","JPEG");
                         mCallback.onPictureTaken(data,0);
                     }
                     else if (image.getFormat() == ImageFormat.FLEX_RGBA_8888){
+                        Log.e("joooo","RGBA");
                         mCallback.onFramePreview(data,image.getWidth(),image.getHeight());
                     } else {
+                        Log.e("joooo","BITs");
                         mCallback.onFramePreview(data, image.getWidth(), image.getHeight(), mDisplayOrientation);
                     }
                     image.close();
@@ -774,7 +778,7 @@ class Camera2 extends CameraViewImpl implements MediaRecorder.OnInfoListener, Me
         }
         Size largest = mPreviewSizes.sizes(mAspectRatio).last();
         mScannImages = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
-                ImageFormat.FLEX_RGBA_8888, 1);
+                ImageFormat.RGB_565, 1);
         mScannImages.setOnImageAvailableListener(mOnImageAvailableListener, null);
     }
 

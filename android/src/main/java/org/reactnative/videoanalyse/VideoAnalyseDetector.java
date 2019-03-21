@@ -33,7 +33,7 @@ public class VideoAnalyseDetector implements Classifier{
     private float[][] outputClasses;
     private float[][] outputScores;
     private float[] numDetections;
-    private static final int NUM_THREADS = 4;
+    private static final int NUM_THREADS = 1;
     private static final int NUM_DETECTIONS = 10;
     private ByteBuffer imgData;
     int labelOffset = 1;
@@ -44,7 +44,7 @@ public class VideoAnalyseDetector implements Classifier{
 
     private MappedByteBuffer loadedModel = null;
 
-    private boolean quant = true;
+    private boolean quant = false;
 
 
     private Delegate gpuDelegate = null;
