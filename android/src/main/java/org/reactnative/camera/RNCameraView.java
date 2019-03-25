@@ -3,12 +3,15 @@ package org.reactnative.camera;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.media.CamcorderProfile;
 import android.media.MediaActionSound;
 import android.os.Build;
+import android.os.SystemClock;
 import android.support.v4.content.ContextCompat;
 import android.util.SparseArray;
+import android.view.TextureView;
 import android.view.View;
 import android.os.AsyncTask;
 import com.facebook.react.bridge.*;
@@ -27,10 +30,14 @@ import org.reactnative.camera.tasks.*;
 import org.reactnative.camera.utils.ImageDimensions;
 import org.reactnative.camera.utils.RNFileUtils;
 import org.reactnative.facedetector.RNFaceDetector;
+import org.reactnative.videoanalyse.Classifier;
+import org.reactnative.videoanalyse.MobileClassifier;
 import org.reactnative.videoanalyse.RNVideoAnalyse;
 import org.reactnative.camera.tasks.VideoAnalyseDetectorAsyncTaskDelegate;
 import org.reactnative.camera.tasks.VideoAnalyseDetectorAsyncTask;
 import org.reactnative.videoanalyse.Classifier.Recognition;
+import org.reactnative.videoanalyse.VideoAnalyseDetector;
+
 import android.util.Log;
 
 import java.io.File;
@@ -38,7 +45,10 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import android.util.Log;
+
+import android.os.Handler;
+import android.os.HandlerThread;
+import org.reactnative.camera.R;
 
 public class RNCameraView extends CameraView implements LifecycleEventListener, BarCodeScannerAsyncTaskDelegate, FaceDetectorAsyncTaskDelegate,
     BarcodeDetectorAsyncTaskDelegate, VideoAnalyseDetectorAsyncTaskDelegate, TextRecognizerAsyncTaskDelegate, PictureSavedDelegate {
@@ -77,9 +87,16 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   private int mGoogleVisionBarCodeType = Barcode.ALL_FORMATS;
   private int mGoogleVisionBarCodeMode = RNBarcodeDetector.NORMAL_MODE;
 
-  private int frameCounter = 0;
-  private int lastShot = -10;
-  private int analyseCounter = 0;
+  private HandlerThread backgroundThread;
+  private Handler backgroundHandler;
+  private final Object lock = new Object();
+  private boolean runAnalyse = false;
+  private Classifier classifier;
+  private TextureView textureView;
+
+  private boolean GPU = false;
+  private boolean NNAPI = false;
+
 
   public RNCameraView(ThemedReactContext themedReactContext) {
     super(themedReactContext, true);
@@ -92,6 +109,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
       @Override
       public void onCameraOpened(CameraView cameraView) {
         RNCameraViewHelper.emitCameraReadyEvent(cameraView);
+        startBackgroundThread();
       }
 
       @Override
@@ -141,24 +159,19 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
 
       @Override
       public void onFramePreview(CameraView cameraView, byte[] data, int width, int height, int rotation) {
-        frameCounter += 1;
-        Log.e("traaaa","onFramePreview");
         int correctRotation = RNCameraViewHelper.getCorrectCameraRotation(rotation, getFacing(), getCameraOrientation());
         boolean willCallBarCodeTask = mShouldScanBarCodes && !barCodeScannerTaskLock && cameraView instanceof BarCodeScannerAsyncTaskDelegate;
         boolean willCallFaceTask = mShouldDetectFaces && !faceDetectorTaskLock && cameraView instanceof FaceDetectorAsyncTaskDelegate;
         boolean willCallGoogleBarcodeTask = mShouldGoogleDetectBarcodes && !googleBarcodeDetectorTaskLock && cameraView instanceof BarcodeDetectorAsyncTaskDelegate;
         boolean willCallTextTask = mShouldRecognizeText && !textRecognizerTaskLock && cameraView instanceof TextRecognizerAsyncTaskDelegate;
-        boolean willCallVideoAnalyseTask = (frameCounter - lastShot >= 4) && !videoAnalyseLock && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
+        boolean willCallVideoAnalyseTask = !videoAnalyseLock && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
 
-        Log.e("error","video analyse task "+ willCallVideoAnalyseTask);
         if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask && !willCallVideoAnalyseTask) {
           return;
         }
-          Log.e("error","video vor data "+data.length + " "+width+" "+height + " "+ (1.5*width*height));
         if (data.length < (1.5 * width * height)) {
             return;
         }
-        Log.e("error","video nach data");
 
         if (willCallBarCodeTask) {
           barCodeScannerTaskLock = true;
@@ -189,16 +202,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           }
           BarcodeDetectorAsyncTaskDelegate delegate = (BarcodeDetectorAsyncTaskDelegate) cameraView;
           new BarcodeDetectorAsyncTask(delegate, mGoogleBarcodeDetector, data, width, height, correctRotation).execute();
-        }
-
-        Log.e("error","video analyse task "+ willCallVideoAnalyseTask);
-
-        if (willCallVideoAnalyseTask){
-          analyseCounter += 1;
-          lastShot = analyseCounter;
-          videoAnalyseLock = true;
-          VideoAnalyseDetectorAsyncTaskDelegate delegate = (VideoAnalyseDetectorAsyncTaskDelegate) cameraView;
-          new VideoAnalyseDetectorAsyncTask(mVideoAnalyseDetector, delegate, data, width, height, correctRotation).execute();
         }
 
         if (willCallTextTask) {
@@ -441,15 +444,21 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   }
 
   private void setupVideoAnalyse(){
-    mVideoAnalyseDetector = new RNVideoAnalyse(mThemedReactContext);
+    //mVideoAnalyseDetector = new RNVideoAnalyse(mThemedReactContext);
   }
 
   public void setGPU(boolean gpu){
-      mVideoAnalyseDetector.setGPU(gpu);
+    if( gpu != GPU) {
+      GPU = gpu;
+      updateActiveModel();
+    }
   }
 
   public void setNNAPI(boolean nnapi){
-      mVideoAnalyseDetector.setNNAPI(nnapi);
+    if (NNAPI != nnapi) {
+      NNAPI = nnapi;
+      updateActiveModel();
+    }
   }
 
   /**
@@ -540,6 +549,86 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     RNCameraViewHelper.emitTextRecognizedEvent(this, textBlocksDetected, dimensions);
   }
 
+  private void startBackgroundThread(){
+    backgroundThread = new HandlerThread("VideoAnalyseThread");
+    backgroundThread.start();
+    backgroundHandler = new Handler(backgroundThread.getLooper());
+    synchronized (lock){
+      runAnalyse = true;
+    }
+
+    backgroundHandler.post(periodicAnalyse);
+    updateActiveModel();
+  }
+
+  private void stopBackgroundThread() {
+    backgroundThread.quitSafely();
+    try{
+      backgroundThread.join();
+      backgroundThread = null;
+      backgroundHandler = null;
+      synchronized (lock){
+        runAnalyse = false;
+      }
+    } catch (InterruptedException e){
+      Log.e("RNCamera","Interupted Exception while stopping Background thread", e);
+    }
+  }
+
+  private void updateActiveModel(){
+    backgroundHandler.post(new Runnable() {
+      @Override
+      public void run() {
+        if (classifier != null) {
+          classifier.close();
+          classifier = null;
+        }
+        try {
+          Log.e("RNCameraView", "Initialise Classifier");
+          classifier = new MobileClassifier(mThemedReactContext);
+
+          if (GPU) {
+            classifier.useGpu();
+          } else if (NNAPI) {
+            classifier.useNNAPI();
+          }
+        } catch (IOException e) {
+          Log.e("RNCameraView", "Couldnt initalise model" + e.toString());
+          classifier = null;
+        }
+      }
+    });
+  }
+
+  private void classifyFrame(){
+    if (classifier == null) {
+      return;
+    }
+    if (textureView == null) {
+      textureView = getView().findViewById(R.id.texture_view);
+    }
+    long bitmapstarttime = SystemClock.uptimeMillis();
+    Bitmap bitmap = textureView.getBitmap(classifier.getImageSizeX(), classifier.getImageSizeY());
+    long imageStartTime = SystemClock.uptimeMillis();
+    Log.e("RNCameraView", "Timecost to load Bitmap: " + Long.toString(imageStartTime - bitmapstarttime));
+    classifier.analyseFrame(bitmap);
+    long allEndTime = SystemClock.uptimeMillis();
+    Log.e("RNCameraView", "Timecost to analyse all: " + Long.toString(allEndTime - imageStartTime));
+  }
+
+  private Runnable periodicAnalyse =
+          new Runnable() {
+            @Override
+            public void run() {
+              synchronized (lock) {
+                if (runAnalyse) {
+                  classifyFrame();
+                }
+              }
+              backgroundHandler.post(periodicAnalyse);
+            }
+          };
+
   @Override
   public void onTextRecognizerTaskCompleted() {
     textRecognizerTaskLock = false;
@@ -560,6 +649,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
 
   @Override
   public void onHostPause() {
+    stopBackgroundThread();
     if (!mIsPaused && isCameraOpened()) {
       mIsPaused = true;
       stop();
@@ -579,6 +669,9 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     }
     if (mTextRecognizer != null) {
       mTextRecognizer.release();
+    }
+    if( classifier != null) {
+      classifier.close();
     }
     mMultiFormatReader = null;
     stop();

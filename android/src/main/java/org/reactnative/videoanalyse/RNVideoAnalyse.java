@@ -10,6 +10,8 @@ import android.util.Log;
 import org.reactnative.videoanalyse.Classifier.Recognition;
 import android.graphics.Bitmap;
 
+import java.io.IOException;
+
 public class RNVideoAnalyse{
 
     private VideoAnalyseDetector mVideoAnaylseDetector;
@@ -22,12 +24,15 @@ public class RNVideoAnalyse{
     private static final String TF_OD_API_LABELS_FILE = "labels.txt";
 
     public RNVideoAnalyse(Context context){
-        mContext = context;
-        mDecoder = new VideoAnalyseDetector();
-        if (mVideoAnaylseDetector == null){
-            createVideoAnalyseDetector();
+        try {
+            mContext = context;
+            mDecoder = new VideoAnalyseDetector(context.getAssets());
+            if (mVideoAnaylseDetector == null) {
+                createVideoAnalyseDetector();
+            }
+        }catch (IOException e){
+            Log.e("RNVideoAnalyse","IOException");
         }
-        Log.e("Error","created detector");
     }
 
     public boolean isOperational() {

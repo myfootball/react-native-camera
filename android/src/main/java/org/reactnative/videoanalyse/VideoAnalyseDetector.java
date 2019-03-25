@@ -1,5 +1,7 @@
 package org.reactnative.videoanalyse;
 
+import android.app.Activity;
+import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import java.io.BufferedReader;
@@ -24,7 +26,7 @@ import java.nio.ByteOrder;
 
 import org.tensorflow.lite.Delegate;
 
-public class VideoAnalyseDetector implements Classifier{
+public class VideoAnalyseDetector extends Classifier{
     private int inputSize;
     private Vector<String> labels = new Vector<String>();
     private Interpreter tfLite;
@@ -51,7 +53,8 @@ public class VideoAnalyseDetector implements Classifier{
     private Interpreter.Options tfoptions =  new Interpreter.Options();
 
 
-    public VideoAnalyseDetector (){
+    public VideoAnalyseDetector (AssetManager assetManager) throws IOException{
+        super(assetManager);
         tfoptions = new Interpreter.Options();
     }
 
@@ -68,11 +71,12 @@ public class VideoAnalyseDetector implements Classifier{
 
     public static Classifier create(final String labelNames, final int inputSize,
                                     final AssetManager assetManager,
-                                    final String modelFilename){
-        final VideoAnalyseDetector d = new VideoAnalyseDetector();
-        InputStream labelsInput = null;
+                                    final String modelFilename) {
+        VideoAnalyseDetector d = null;
         try {
-            if(d.tfoptions == null){
+            d = new VideoAnalyseDetector(assetManager);
+            InputStream labelsInput = null;
+            if (d.tfoptions == null) {
                 d.tfoptions = new Interpreter.Options();
             }
             String actualFilename = labelNames;
@@ -87,10 +91,13 @@ public class VideoAnalyseDetector implements Classifier{
             d.inputSize = inputSize;
             d.loadedModel = loadModelFile(assetManager, modelFilename);
             //d.tfoptions.setNumThreads(4);
-            d.tfLite = new Interpreter(d.loadedModel,d.tfoptions);//,options);
+            d.tfLite = new Interpreter(d.loadedModel, d.tfoptions);//,options);
             //d.tfLite.setUseNNAPI(false); // Error with inception net
             d.tfLite.setNumThreads(4);
-        } catch (Exception e) {
+        }catch (IOException e){
+            Log.e("Error","IOException at VideoAnalyse creation");
+            throw new RuntimeException(e);
+        }catch (Exception e) {
             Log.e("Error","found an error");
             throw new RuntimeException(e);
         }
@@ -226,6 +233,41 @@ public class VideoAnalyseDetector implements Classifier{
 
     public String getStatString() {
         return "";
+    }
+
+    @Override
+    public int getImageSizeX() {
+        return 0;
+    }
+
+    @Override
+    public int getImageSizeY() {
+        return 0;
+    }
+
+    @Override
+    protected int getNumBytesChannels() {
+        return 0;
+    }
+
+    @Override
+    protected String getModelPath() {
+        return null;
+    }
+
+    @Override
+    protected String getLabelPath() {
+        return null;
+    }
+
+    @Override
+    protected void runInference() {
+
+    }
+
+    @Override
+    protected void addPixelValue(int pixelValue) {
+
     }
 
     public List<Recognition> recognizeImage(Bitmap bitmap){
