@@ -32,11 +32,8 @@ import org.reactnative.camera.utils.RNFileUtils;
 import org.reactnative.facedetector.RNFaceDetector;
 import org.reactnative.videoanalyse.Classifier;
 import org.reactnative.videoanalyse.MobileClassifier;
-import org.reactnative.videoanalyse.RNVideoAnalyse;
-import org.reactnative.camera.tasks.VideoAnalyseDetectorAsyncTaskDelegate;
-import org.reactnative.camera.tasks.VideoAnalyseDetectorAsyncTask;
 import org.reactnative.videoanalyse.Classifier.Recognition;
-import org.reactnative.videoanalyse.VideoAnalyseDetector;
+import com.facebook.react.bridge.LifecycleEventListener;
 
 import android.util.Log;
 
@@ -51,7 +48,7 @@ import android.os.HandlerThread;
 import org.reactnative.camera.R;
 
 public class RNCameraView extends CameraView implements LifecycleEventListener, BarCodeScannerAsyncTaskDelegate, FaceDetectorAsyncTaskDelegate,
-    BarcodeDetectorAsyncTaskDelegate, VideoAnalyseDetectorAsyncTaskDelegate, TextRecognizerAsyncTaskDelegate, PictureSavedDelegate {
+    BarcodeDetectorAsyncTaskDelegate, TextRecognizerAsyncTaskDelegate, PictureSavedDelegate {
   private ThemedReactContext mThemedReactContext;
   private Queue<Promise> mPictureTakenPromises = new ConcurrentLinkedQueue<>();
   private Map<Promise, ReadableMap> mPictureTakenOptions = new ConcurrentHashMap<>();
@@ -68,14 +65,12 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   public volatile boolean barCodeScannerTaskLock = false;
   public volatile boolean faceDetectorTaskLock = false;
   public volatile boolean googleBarcodeDetectorTaskLock = false;
-  public volatile boolean videoAnalyseLock = false;
   public volatile boolean textRecognizerTaskLock = false;
 
   // Scanning-related properties
   private MultiFormatReader mMultiFormatReader;
   private RNFaceDetector mFaceDetector;
   private RNBarcodeDetector mGoogleBarcodeDetector;
-  private RNVideoAnalyse mVideoAnalyseDetector;
   private TextRecognizer mTextRecognizer;
   private boolean mShouldDetectFaces = false;
   private boolean mShouldGoogleDetectBarcodes = false;
@@ -93,9 +88,12 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   private boolean runAnalyse = false;
   private Classifier classifier;
   private TextureView textureView;
-
   private boolean GPU = false;
   private boolean NNAPI = false;
+  private Long overalltime = 0L;
+  private int runs = 0;
+  private int NUMTHREADS = 1;
+  private String TAG = "RNCamera";
 
 
   public RNCameraView(ThemedReactContext themedReactContext) {
@@ -164,9 +162,8 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         boolean willCallFaceTask = mShouldDetectFaces && !faceDetectorTaskLock && cameraView instanceof FaceDetectorAsyncTaskDelegate;
         boolean willCallGoogleBarcodeTask = mShouldGoogleDetectBarcodes && !googleBarcodeDetectorTaskLock && cameraView instanceof BarcodeDetectorAsyncTaskDelegate;
         boolean willCallTextTask = mShouldRecognizeText && !textRecognizerTaskLock && cameraView instanceof TextRecognizerAsyncTaskDelegate;
-        boolean willCallVideoAnalyseTask = !videoAnalyseLock && cameraView instanceof VideoAnalyseDetectorAsyncTaskDelegate;
 
-        if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask && !willCallVideoAnalyseTask) {
+        if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask) {
           return;
         }
         if (data.length < (1.5 * width * height)) {
@@ -211,10 +208,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         }
       }
     });
-    if (mVideoAnalyseDetector == null){
-      setupVideoAnalyse();
-    }
-
   }
 
   @Override
@@ -443,24 +436,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     faceDetectorTaskLock = false;
   }
 
-  private void setupVideoAnalyse(){
-    //mVideoAnalyseDetector = new RNVideoAnalyse(mThemedReactContext);
-  }
-
-  public void setGPU(boolean gpu){
-    if( gpu != GPU) {
-      GPU = gpu;
-      updateActiveModel();
-    }
-  }
-
-  public void setNNAPI(boolean nnapi){
-    if (NNAPI != nnapi) {
-      NNAPI = nnapi;
-      updateActiveModel();
-    }
-  }
-
   /**
    * Initial setup of the barcode detector
    */
@@ -506,25 +481,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   }
 
   @Override
-  public void onVideoAnalyseTaskCompleted() {
-    videoAnalyseLock = false;
-  }
-
-  @Override
-  public void onVideoAnalyseError(RNVideoAnalyse videoAnalyse){
-
-  }
-
-  @Override
-  public void onVideoAnalyseDetected(SparseArray<Recognition> recognition, int mWidth, int mHeight, int mRotation){
-    SparseArray<Recognition> detectedBoxes = recognition == null ? new SparseArray<Recognition>() : recognition;
-
-    RNCameraViewHelper.emitVideoAnalyseDetectedEvent(this, detectedBoxes);
-
-
-  }
-
-  @Override
   public void onBarcodeDetectingTaskCompleted() {
     googleBarcodeDetectorTaskLock = false;
   }
@@ -549,6 +505,20 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     RNCameraViewHelper.emitTextRecognizedEvent(this, textBlocksDetected, dimensions);
   }
 
+  public void setGPU(boolean gpu){
+    if( gpu != GPU) {
+      GPU = gpu;
+      updateActiveModel();
+    }
+  }
+
+  public void setNNAPI(boolean nnapi){
+    if (NNAPI != nnapi) {
+      NNAPI = nnapi;
+      updateActiveModel();
+    }
+  }
+
   private void startBackgroundThread(){
     backgroundThread = new HandlerThread("VideoAnalyseThread");
     backgroundThread.start();
@@ -571,7 +541,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         runAnalyse = false;
       }
     } catch (InterruptedException e){
-      Log.e("RNCamera","Interupted Exception while stopping Background thread", e);
+      Log.e(TAG,"Interupted Exception while stopping Background thread", e);
     }
   }
 
@@ -584,24 +554,23 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           classifier = null;
         }
         try {
-          Log.e("RNCameraView", "Initialise Classifier");
+          Log.e(TAG, "Initialised Classifier");
           classifier = new MobileClassifier(mThemedReactContext);
-
+          if(NUMTHREADS != 1) {
+            classifier.setNumThreads(NUMTHREADS);
+          }
           if (GPU) {
             classifier.useGpu();
           } else if (NNAPI) {
             classifier.useNNAPI();
           }
         } catch (IOException e) {
-          Log.e("RNCameraView", "Couldnt initalise model" + e.toString());
+          Log.e(TAG, "Couldnt initialise Classifier" + e.toString());
           classifier = null;
         }
       }
     });
   }
-
-  private Long overalltime = 0L;
-  private int runs = 0;
 
   private void classifyFrame(){
     if (classifier == null) {
@@ -614,15 +583,15 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     long bitmapstarttime = SystemClock.uptimeMillis();
     Bitmap bitmap = textureView.getBitmap(classifier.getImageSizeX(), classifier.getImageSizeY());
     long imageStartTime = SystemClock.uptimeMillis();
-    Log.e("RNCameraView", "Timecost to load Bitmap: " + Long.toString(imageStartTime - bitmapstarttime));
+    Log.e(TAG, "Timecost to load Bitmap: " + Long.toString(imageStartTime - bitmapstarttime));
     SparseArray<Recognition> detectedBoxes = classifier.analyseFrame(bitmap);
     if (detectedBoxes != null){
       RNCameraViewHelper.emitVideoAnalyseDetectedEvent(this, detectedBoxes);
     }
     long allEndTime = SystemClock.uptimeMillis();
-    Log.e("RNCameraView", "Timecost to analyse all: " + Long.toString(allEndTime - imageStartTime));
+    Log.e(TAG, "Timecost to analyse all: " + Long.toString(allEndTime - imageStartTime));
     overalltime += (allEndTime-imageStartTime);
-    Log.e("RNCameraView", "Timecost average: " + Long.toString(overalltime/runs));
+    Log.e(TAG, "Timecost average: " + Long.toString(overalltime/runs));
   }
 
   private Runnable periodicAnalyse =
@@ -672,9 +641,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     }
     if (mGoogleBarcodeDetector != null) {
       mGoogleBarcodeDetector.release();
-    }
-    if (mVideoAnalyseDetector != null) {
-      mVideoAnalyseDetector.release();
     }
     if (mTextRecognizer != null) {
       mTextRecognizer.release();

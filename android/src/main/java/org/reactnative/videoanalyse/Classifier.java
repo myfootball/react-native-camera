@@ -26,21 +26,14 @@ import java.util.Map;
 import org.tensorflow.lite.Delegate;
 import org.tensorflow.lite.Interpreter;
 
-/**
- * Generic interface for interacting with different recognition engines.
- */
 public abstract class Classifier {
 
-    private static final String LOGTAG = "CLASSIFIER";
-    private static final int QUANTIZED = 1;
-    private static final int FLOATINGPOINT = 4;
     private final Interpreter.Options tfliteOptions = new Interpreter.Options();
     private MappedByteBuffer tfliteModel;
     protected Interpreter tflite;
     private List<String> labelList;
-    protected ByteBuffer imgData = null;
+    protected ByteBuffer imgData;
     private Delegate gpuDelegate = null;
-    private float[][] labelProbArray = null;
     private float[][][] outputLocations;
     private float[][] outputClasses;
     private float[][] outputScores;
@@ -50,6 +43,7 @@ public abstract class Classifier {
     private int[] intValues = new int[getImageSizeX() * getImageSizeY()];
     private int labelOffset = 1;
     private float minDetection = 0.5f;
+    private String TAG = "Classifier";
 
     Classifier(final AssetManager assetManager) throws IOException {
         tfliteModel = loadModelFile(assetManager);
@@ -65,7 +59,6 @@ public abstract class Classifier {
         outputScores = new float[1][NUM_DETECTIONS];
         numDetections = new float[1];
 
-        Object[] inputArray = {imgData};
         outputMap = new HashMap<>();
         outputMap.put(0, outputLocations);
         outputMap.put(1, outputClasses);
@@ -85,9 +78,9 @@ public abstract class Classifier {
         printOutput();
 
         long allEndTime = SystemClock.uptimeMillis();
-        Log.e("RNCameraView", "Timecost to convert Bitmap: " + Long.toString(infernceStart - convertStart));
-        Log.e("RNCameraView", "Timecost to runinfernce: " + Long.toString(outputStart - infernceStart));
-        Log.e("RNCameraView", "Timecost to print: " + Long.toString(allEndTime - outputStart));
+        Log.e(TAG, "Timecost to convert Bitmap: " + Long.toString(infernceStart - convertStart));
+        Log.e(TAG, "Timecost to runinfernce: " + Long.toString(outputStart - infernceStart));
+        Log.e(TAG, "Timecost to print: " + Long.toString(allEndTime - outputStart));
 
         return prepareResults();
     }
@@ -98,7 +91,6 @@ public abstract class Classifier {
         }
         imgData.rewind();
         bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
-        // Convert the image to floating point.
         int pixel = 0;
         long startTime = SystemClock.uptimeMillis();
         for (int i = 0; i < getImageSizeX(); ++i) {
@@ -108,11 +100,10 @@ public abstract class Classifier {
             }
         }
         long endTime = SystemClock.uptimeMillis();
-        Log.d("lassifier", "Timecost to put values into ByteBuffer: " + Long.toString(endTime - startTime));
+        Log.d(TAG, "Timecost to put values into ByteBuffer: " + Long.toString(endTime - startTime));
     }
 
     private MappedByteBuffer loadModelFile(final AssetManager assetManager) throws IOException {
-        Log.e("CLassifier", "Path "+ getModelPath());
         AssetFileDescriptor fileDescriptor = assetManager.openFd(getModelPath());
         FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
         FileChannel fileChannel = inputStream.getChannel();
@@ -143,13 +134,7 @@ public abstract class Classifier {
     private void printOutput(){
         for (int i = 0; i < NUM_DETECTIONS; ++i) {
             if (outputScores[0][i] >= minDetection) {
-                final RectF detection =
-                        new RectF(
-                                outputLocations[0][i][1],
-                                outputLocations[0][i][0],
-                                outputLocations[0][i][3],
-                                outputLocations[0][i][2]);
-                Log.e("Classifier", detection.toString() + " " + labelList.get((int) outputClasses[0][i] + 1) + " " + (outputScores[0][i] * 100));
+                Log.e(TAG,  labelList.get((int) outputClasses[0][i] + 1) + " " + (outputScores[0][i] * 100));
             }
         }
     }
@@ -187,11 +172,6 @@ public abstract class Classifier {
         }
     }
 
-    public void useCPU() {
-        tfliteOptions.setUseNNAPI(false);
-        recreateInterpreter();
-    }
-
     public void useNNAPI() {
         tfliteOptions.setUseNNAPI(true);
         recreateInterpreter();
@@ -217,23 +197,9 @@ public abstract class Classifier {
     protected abstract void addPixelValue(int pixelValue);
 
     public class Recognition {
-        /**
-         * A unique identifier for what has been recognized. Specific to the class, not the instance of
-         * the object.
-         */
         private final String id;
-
-        /**
-         * Display name for the recognition.
-         */
         private final String title;
-
-        /**
-         * A sortable score for how good the recognition is relative to others. Higher should be better.
-         */
         private final Float confidence;
-
-        /** Optional location within the source image for the location of the recognized object. */
         private RectF location;
 
         public Recognition(
@@ -286,8 +252,4 @@ public abstract class Classifier {
             return resultString.trim();
         }
     }
-
-    abstract List<Recognition> recognizeImage(Bitmap bitmap);
-
-    abstract String getStatString();
 }
