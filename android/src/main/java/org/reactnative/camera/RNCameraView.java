@@ -600,6 +600,9 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     });
   }
 
+  private Long overalltime = 0L;
+  private int runs = 0;
+
   private void classifyFrame(){
     if (classifier == null) {
       return;
@@ -607,13 +610,19 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     if (textureView == null) {
       textureView = getView().findViewById(R.id.texture_view);
     }
+    runs += 1;
     long bitmapstarttime = SystemClock.uptimeMillis();
     Bitmap bitmap = textureView.getBitmap(classifier.getImageSizeX(), classifier.getImageSizeY());
     long imageStartTime = SystemClock.uptimeMillis();
     Log.e("RNCameraView", "Timecost to load Bitmap: " + Long.toString(imageStartTime - bitmapstarttime));
-    classifier.analyseFrame(bitmap);
+    SparseArray<Recognition> detectedBoxes = classifier.analyseFrame(bitmap);
+    if (detectedBoxes != null){
+      RNCameraViewHelper.emitVideoAnalyseDetectedEvent(this, detectedBoxes);
+    }
     long allEndTime = SystemClock.uptimeMillis();
     Log.e("RNCameraView", "Timecost to analyse all: " + Long.toString(allEndTime - imageStartTime));
+    overalltime += (allEndTime-imageStartTime);
+    Log.e("RNCameraView", "Timecost average: " + Long.toString(overalltime/runs));
   }
 
   private Runnable periodicAnalyse =

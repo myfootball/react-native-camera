@@ -7,6 +7,7 @@ import android.graphics.Bitmap;
 import android.graphics.RectF;
 import android.os.SystemClock;
 import android.util.Log;
+import android.util.SparseArray;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -47,6 +48,8 @@ public abstract class Classifier {
     private static final int NUM_DETECTIONS = 10;
     Map<Integer, Object> outputMap;
     private int[] intValues = new int[getImageSizeX() * getImageSizeY()];
+    private int labelOffset = 1;
+    private float minDetection = 0.5f;
 
     Classifier(final AssetManager assetManager) throws IOException {
         tfliteModel = loadModelFile(assetManager);
@@ -70,9 +73,9 @@ public abstract class Classifier {
         outputMap.put(3, numDetections);
     }
 
-    public void analyseFrame(Bitmap bitmap){
+    public SparseArray<Recognition> analyseFrame(Bitmap bitmap){
         if (tflite == null){
-            return;
+            return null;
         }
         long convertStart = SystemClock.uptimeMillis();
         convertBitmapToByteBuffer(bitmap);
@@ -85,6 +88,8 @@ public abstract class Classifier {
         Log.e("RNCameraView", "Timecost to convert Bitmap: " + Long.toString(infernceStart - convertStart));
         Log.e("RNCameraView", "Timecost to runinfernce: " + Long.toString(outputStart - infernceStart));
         Log.e("RNCameraView", "Timecost to print: " + Long.toString(allEndTime - outputStart));
+
+        return prepareResults();
     }
 
     private void convertBitmapToByteBuffer(Bitmap bitmap) {
@@ -137,14 +142,41 @@ public abstract class Classifier {
 
     private void printOutput(){
         for (int i = 0; i < NUM_DETECTIONS; ++i) {
+            if (outputScores[0][i] >= minDetection) {
+                final RectF detection =
+                        new RectF(
+                                outputLocations[0][i][1],
+                                outputLocations[0][i][0],
+                                outputLocations[0][i][3],
+                                outputLocations[0][i][2]);
+                Log.e("Classifier", detection.toString() + " " + labelList.get((int) outputClasses[0][i] + 1) + " " + (outputScores[0][i] * 100));
+            }
+        }
+    }
+
+    private SparseArray<Recognition> prepareResults(){
+        SparseArray<Recognition> boxes = new SparseArray(NUM_DETECTIONS);
+        int heigth = 330;
+        int width = 690;
+        for (int i = 0; i < NUM_DETECTIONS; ++i) {
+            if (((int) outputClasses[0][i]) < 0 && outputScores[0][i] < minDetection){
+
+            } else{
             final RectF detection =
                     new RectF(
-                            outputLocations[0][i][1] ,
-                            outputLocations[0][i][0] ,
-                            outputLocations[0][i][3] ,
-                            outputLocations[0][i][2]);
-            Log.e("Classifier",detection.toString()+ " " + labelList.get((int) outputClasses[0][i] + 1));
+                            outputLocations[0][i][1] * getImageSizeX() * (width/getImageSizeX()),
+                            outputLocations[0][i][0] * getImageSizeY() * (heigth/getImageSizeX()),
+                            outputLocations[0][i][3] * getImageSizeX() * (width/getImageSizeX()),
+                            outputLocations[0][i][2] * getImageSizeX() * (heigth/getImageSizeX()));
+                boxes.append(i,
+                        new Recognition(
+                                "" + i,
+                                labelList.get((int) outputClasses[0][i] + labelOffset),
+                                outputScores[0][i],
+                                detection));
+            }
         }
+        return boxes;
     }
 
     public void useGpu() {
