@@ -74,6 +74,12 @@ public class CameraViewManager extends ViewGroupManager<RNCameraView> {
   @ReactProp(name = "gpu")
   public void setGPU(RNCameraView view, boolean gpu) { view.setGPU(gpu);}
 
+  @ReactProp(name = "model")
+  public void setModel(RNCameraView view, int model) { view.setModel(model);}
+
+  @ReactProp(name = "threads")
+  public void setThreads(RNCameraView view, int model) { view.setThreads(threads);}
+
   @ReactProp(name = "type")
   public void setType(RNCameraView view, int type) {
     view.setFacing(type);

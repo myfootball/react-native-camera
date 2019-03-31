@@ -95,6 +95,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   private TextureView textureView;
   private boolean GPU = false;
   private boolean NNAPI = false;
+  private int mModel = 0;
   private Long overalltime = 0L;
   private int runs = 0;
   private int NUMTHREADS = 1;
@@ -524,6 +525,20 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     }
   }
 
+  public void setModel(int model){
+    if ( mModel != model){
+      mModel = model;
+      updateActiveModel();
+    }
+  }
+
+  public void setThreads(int threads){
+    if ( NUMTHREADS != threads){
+      NUMTHREADS = threads;
+      updateActiveModel();
+    }
+  }
+
   private void startBackgroundThread(){
     backgroundThread = new HandlerThread("VideoAnalyseThread");
     backgroundThread.start();
@@ -561,8 +576,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         try {
           Log.e(TAG, "Initialised Classifier");
           //classifier = new MobileClassifier(mThemedReactContext);
-          int a = 0;
-          switch (a) {
+          switch (mModel) {
             case 0:
               classifier = new MaInceptionV2(mThemedReactContext);
               break;
