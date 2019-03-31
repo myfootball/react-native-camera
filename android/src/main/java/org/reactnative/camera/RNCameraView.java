@@ -31,6 +31,11 @@ import org.reactnative.camera.utils.ImageDimensions;
 import org.reactnative.camera.utils.RNFileUtils;
 import org.reactnative.facedetector.RNFaceDetector;
 import org.reactnative.videoanalyse.Classifier;
+import org.reactnative.videoanalyse.MaInceptionV2;
+import org.reactnative.videoanalyse.MaMobV1;
+import org.reactnative.videoanalyse.MaMobV1Quant;
+import org.reactnative.videoanalyse.MaMobV2;
+import org.reactnative.videoanalyse.MaMobV2Quant;
 import org.reactnative.videoanalyse.MobileClassifier;
 import org.reactnative.videoanalyse.Classifier.Recognition;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -555,7 +560,25 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         }
         try {
           Log.e(TAG, "Initialised Classifier");
-          classifier = new MobileClassifier(mThemedReactContext);
+          //classifier = new MobileClassifier(mThemedReactContext);
+          int a = 0;
+          switch (a) {
+            case 0:
+              classifier = new MaInceptionV2(mThemedReactContext);
+              break;
+            case 1:
+              classifier = new MaMobV1(mThemedReactContext);
+              break;
+            case 2:
+              classifier = new MaMobV1Quant(mThemedReactContext);
+              break;
+            case 3:
+              classifier = new MaMobV2(mThemedReactContext);
+              break;
+            case 4:
+              classifier = new MaMobV2Quant(mThemedReactContext);
+              break;
+          }
           if(NUMTHREADS != 1) {
             classifier.setNumThreads(NUMTHREADS);
           }
