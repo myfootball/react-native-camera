@@ -26,7 +26,7 @@ public class MaMobV1Quant extends Classifier {
     }
 
     @Override
-    protected String getModelPath() {
+    public String getModelPath() {
         return "MA_Mob_V1_Quant.tflite";
     }
 

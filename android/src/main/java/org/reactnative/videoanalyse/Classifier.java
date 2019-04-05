@@ -1,6 +1,5 @@
 package org.reactnative.videoanalyse;
 
-import android.app.Activity;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
@@ -66,14 +65,16 @@ public abstract class Classifier {
         outputMap.put(3, numDetections);
     }
 
-    public SparseArray<Recognition> analyseFrame(Bitmap bitmap){
+    public SparseArray<Recognition> analyseFrame(Bitmap bitmap, TimeHolderObject timing){
         if (tflite == null){
             return null;
         }
         long convertStart = SystemClock.uptimeMillis();
         convertBitmapToByteBuffer(bitmap);
         long infernceStart = SystemClock.uptimeMillis();
+        timing.setPreInfernence();
         runInference();
+        timing.setPostInferenceStart();
         long outputStart = SystemClock.uptimeMillis();
         printOutput();
 
@@ -82,7 +83,8 @@ public abstract class Classifier {
         Log.e(TAG, "Timecost to runinfernce: " + Long.toString(outputStart - infernceStart));
         Log.e(TAG, "Timecost to print: " + Long.toString(allEndTime - outputStart));
 
-        return prepareResults();
+        timing.setInferenceTime(outputStart - infernceStart).setPictureLoadingTime(infernceStart - convertStart);
+        return prepareResults(timing);
     }
 
     private void convertBitmapToByteBuffer(Bitmap bitmap) {
@@ -134,17 +136,18 @@ public abstract class Classifier {
     private void printOutput(){
         for (int i = 0; i < NUM_DETECTIONS; ++i) {
             if (outputScores[0][i] >= minDetection) {
-                Log.e(TAG,  labelList.get((int) outputClasses[0][i] + 1) + " " + (outputScores[0][i] * 100));
+                Log.e(TAG,  labelList.get(Math.abs((int) outputClasses[0][i]) + 1) + " " + (outputScores[0][i] * 100));
             }
         }
     }
 
-    private SparseArray<Recognition> prepareResults(){
+    private SparseArray<Recognition> prepareResults(TimeHolderObject timing){
         SparseArray<Recognition> boxes = new SparseArray(NUM_DETECTIONS);
         int heigth = 330;
         int width = 690;
         for (int i = 0; i < NUM_DETECTIONS; ++i) {
-            if (((int) outputClasses[0][i]) < 0 && outputScores[0][i] < minDetection){
+            Log.e(TAG,""+(outputScores[0][i] < minDetection));
+            if ((Math.abs((int) outputClasses[0][i])) < 0 || outputScores[0][i] < minDetection){
 
             } else{
             final RectF detection =
@@ -156,9 +159,10 @@ public abstract class Classifier {
                 boxes.append(i,
                         new Recognition(
                                 "" + i,
-                                labelList.get((int) outputClasses[0][i] + labelOffset),
+                                labelList.get(Math.abs((int) outputClasses[0][i]) + labelOffset),
                                 outputScores[0][i],
                                 detection));
+            timing.incObjectsDetected();
             }
         }
         return boxes;
@@ -191,7 +195,7 @@ public abstract class Classifier {
     public abstract int getImageSizeX();
     public abstract int getImageSizeY();
     protected abstract int getNumBytesChannels();
-    protected abstract String getModelPath();
+    public abstract String getModelPath();
     protected abstract String getLabelPath();
     protected abstract void runInference();
     protected abstract void addPixelValue(int pixelValue);

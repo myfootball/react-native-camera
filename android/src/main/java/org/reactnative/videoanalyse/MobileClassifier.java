@@ -24,7 +24,7 @@ public class MobileClassifier extends Classifier {
     }
 
     @Override
-    protected String getModelPath() {
+    public String getModelPath() {
         return "detect_coco_v_11_03.tflite";
     }
 

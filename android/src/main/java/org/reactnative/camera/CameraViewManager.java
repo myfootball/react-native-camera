@@ -78,7 +78,7 @@ public class CameraViewManager extends ViewGroupManager<RNCameraView> {
   public void setModel(RNCameraView view, int model) { view.setModel(model);}
 
   @ReactProp(name = "threads")
-  public void setThreads(RNCameraView view, int model) { view.setThreads(threads);}
+  public void setThreads(RNCameraView view, int threads) { view.setThreads(threads);}
 
   @ReactProp(name = "type")
   public void setType(RNCameraView view, int type) {

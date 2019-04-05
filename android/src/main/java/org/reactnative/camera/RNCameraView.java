@@ -31,12 +31,13 @@ import org.reactnative.camera.utils.ImageDimensions;
 import org.reactnative.camera.utils.RNFileUtils;
 import org.reactnative.facedetector.RNFaceDetector;
 import org.reactnative.videoanalyse.Classifier;
+import org.reactnative.videoanalyse.FileHelper;
 import org.reactnative.videoanalyse.MaInceptionV2;
 import org.reactnative.videoanalyse.MaMobV1;
 import org.reactnative.videoanalyse.MaMobV1Quant;
 import org.reactnative.videoanalyse.MaMobV2;
 import org.reactnative.videoanalyse.MaMobV2Quant;
-import org.reactnative.videoanalyse.MobileClassifier;
+import org.reactnative.videoanalyse.FileHelper;
 import org.reactnative.videoanalyse.Classifier.Recognition;
 import com.facebook.react.bridge.LifecycleEventListener;
 
@@ -51,6 +52,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import android.os.Handler;
 import android.os.HandlerThread;
 import org.reactnative.camera.R;
+import org.reactnative.videoanalyse.TimeHolderObject;
 
 public class RNCameraView extends CameraView implements LifecycleEventListener, BarCodeScannerAsyncTaskDelegate, FaceDetectorAsyncTaskDelegate,
     BarcodeDetectorAsyncTaskDelegate, TextRecognizerAsyncTaskDelegate, PictureSavedDelegate {
@@ -100,6 +102,10 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   private int runs = 0;
   private int NUMTHREADS = 1;
   private String TAG = "RNCamera";
+  private static int saves = 0;
+  private static String modelNameForFiles;
+
+  SparseArray<TimeHolderObject> timings;
 
 
   public RNCameraView(ThemedReactContext themedReactContext) {
@@ -569,10 +575,19 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     backgroundHandler.post(new Runnable() {
       @Override
       public void run() {
+        if (timings != null){
+          String modelName = modelNameForFiles;
+          saves += 1;
+          for(int i = 0; i < timings.size(); ++i){
+            TimeHolderObject tmp = timings.valueAt(i);
+            FileHelper.saveToFile(tmp.toString(),modelName, saves);
+          }
+        }
         if (classifier != null) {
           classifier.close();
           classifier = null;
         }
+        timings = new SparseArray<>();
         try {
           Log.e(TAG, "Initialised Classifier");
           //classifier = new MobileClassifier(mThemedReactContext);
@@ -601,6 +616,9 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           } else if (NNAPI) {
             classifier.useNNAPI();
           }
+          modelNameForFiles = classifier.getModelPath().split("\\.")[0];
+          runs = 0;
+          overalltime = 0L;
         } catch (IOException e) {
           Log.e(TAG, "Couldnt initialise Classifier" + e.toString());
           classifier = null;
@@ -616,12 +634,13 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     if (textureView == null) {
       textureView = getView().findViewById(R.id.texture_view);
     }
+    TimeHolderObject timing = new TimeHolderObject().setPreInfernenceStart();
     runs += 1;
     long bitmapstarttime = SystemClock.uptimeMillis();
     Bitmap bitmap = textureView.getBitmap(classifier.getImageSizeX(), classifier.getImageSizeY());
     long imageStartTime = SystemClock.uptimeMillis();
     Log.e(TAG, "Timecost to load Bitmap: " + Long.toString(imageStartTime - bitmapstarttime));
-    SparseArray<Recognition> detectedBoxes = classifier.analyseFrame(bitmap);
+    SparseArray<Recognition> detectedBoxes = classifier.analyseFrame(bitmap,timing);
     if (detectedBoxes != null){
       RNCameraViewHelper.emitVideoAnalyseDetectedEvent(this, detectedBoxes);
     }
@@ -629,6 +648,12 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     Log.e(TAG, "Timecost to analyse all: " + Long.toString(allEndTime - imageStartTime));
     overalltime += (allEndTime-imageStartTime);
     Log.e(TAG, "Timecost average: " + Long.toString(overalltime/runs));
+    timing.setBitmaploadingtime(imageStartTime - bitmapstarttime).
+            setFullTime(allEndTime - imageStartTime).
+            setAvergage(overalltime/runs).
+            setRuns(runs).
+            setPostInference();
+    timings.append(runs,timing);
   }
 
   private Runnable periodicAnalyse =
