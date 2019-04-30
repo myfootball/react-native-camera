@@ -65,26 +65,14 @@ public abstract class Classifier {
         outputMap.put(3, numDetections);
     }
 
-    public SparseArray<Recognition> analyseFrame(Bitmap bitmap, TimeHolderObject timing){
+    public SparseArray<Recognition> analyseFrame(Bitmap bitmap){
         if (tflite == null){
             return null;
         }
-        long convertStart = SystemClock.uptimeMillis();
         convertBitmapToByteBuffer(bitmap);
-        long infernceStart = SystemClock.uptimeMillis();
-        timing.setPreInfernence();
         runInference();
-        timing.setPostInferenceStart();
-        long outputStart = SystemClock.uptimeMillis();
-        printOutput();
 
-        long allEndTime = SystemClock.uptimeMillis();
-        Log.e(TAG, "Timecost to convert Bitmap: " + Long.toString(infernceStart - convertStart));
-        Log.e(TAG, "Timecost to runinfernce: " + Long.toString(outputStart - infernceStart));
-        Log.e(TAG, "Timecost to print: " + Long.toString(allEndTime - outputStart));
-
-        timing.setInferenceTime(outputStart - infernceStart).setPictureLoadingTime(infernceStart - convertStart);
-        return prepareResults(timing);
+        return prepareResults();
     }
 
     private void convertBitmapToByteBuffer(Bitmap bitmap) {
@@ -94,15 +82,12 @@ public abstract class Classifier {
         imgData.rewind();
         bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
         int pixel = 0;
-        long startTime = SystemClock.uptimeMillis();
         for (int i = 0; i < getImageSizeX(); ++i) {
             for (int j = 0; j < getImageSizeY(); ++j) {
                 final int val = intValues[pixel++];
                 addPixelValue(val);
             }
         }
-        long endTime = SystemClock.uptimeMillis();
-        Log.d(TAG, "Timecost to put values into ByteBuffer: " + Long.toString(endTime - startTime));
     }
 
     private MappedByteBuffer loadModelFile(final AssetManager assetManager) throws IOException {
@@ -133,15 +118,7 @@ public abstract class Classifier {
         }
     }
 
-    private void printOutput(){
-        for (int i = 0; i < NUM_DETECTIONS; ++i) {
-            if (outputScores[0][i] >= minDetection) {
-                Log.e(TAG,  labelList.get(Math.abs((int) outputClasses[0][i]) + 1) + " " + (outputScores[0][i] * 100));
-            }
-        }
-    }
-
-    private SparseArray<Recognition> prepareResults(TimeHolderObject timing){
+    private SparseArray<Recognition> prepareResults(){
         SparseArray<Recognition> boxes = new SparseArray(NUM_DETECTIONS);
         int heigth = 330;
         int width = 690;
@@ -162,7 +139,6 @@ public abstract class Classifier {
                                 labelList.get(Math.abs((int) outputClasses[0][i]) + labelOffset),
                                 outputScores[0][i],
                                 detection));
-            timing.incObjectsDetected();
             }
         }
         return boxes;

@@ -17,6 +17,7 @@ public class VideoAnalyseDetectEvent extends Event<VideoAnalyseDetectEvent> {
     private static final Pools.SynchronizedPool<VideoAnalyseDetectEvent> EVENTS_POOL = new Pools.SynchronizedPool<>(3);
 
     private SparseArray<Recognition> mBoxes;
+    private long mTimeStamp;
     private static long lastTime = 0;
 
     private VideoAnalyseDetectEvent(){
@@ -25,22 +26,25 @@ public class VideoAnalyseDetectEvent extends Event<VideoAnalyseDetectEvent> {
 
     public static VideoAnalyseDetectEvent obtain(
         int viewTag,
-        SparseArray<Recognition> boxes
+        SparseArray<Recognition> boxes,
+        long timeStamp
     ){
         VideoAnalyseDetectEvent event = EVENTS_POOL.acquire();
         if (event == null){
             event = new VideoAnalyseDetectEvent();
         }
-        event.init(viewTag, boxes);
+        event.init(viewTag, boxes, timeStamp);
         return event;
     }
 
     private void init(
             int viewTag,
-            SparseArray<Recognition> boxes
+            SparseArray<Recognition> boxes,
+            long timeStamp
     ) {
-        super.init(viewTag);
+        super.init(viewTag, timeStamp);
         mBoxes = boxes;
+        mTimeStamp = timeStamp;
     }
 
     @Override
@@ -77,7 +81,7 @@ public class VideoAnalyseDetectEvent extends Event<VideoAnalyseDetectEvent> {
             serializedBox.putDouble("left", recognition.getLocation().left);
             serializedBox.putDouble("right", recognition.getLocation().right);
             if (lastTime > 0) {
-                serializedBox.putString("time", String.valueOf(System.currentTimeMillis() - lastTime));
+                serializedBox.putString("time", String.valueOf(mTimeStamp));
             }
 
             boxList.pushMap(serializedBox);

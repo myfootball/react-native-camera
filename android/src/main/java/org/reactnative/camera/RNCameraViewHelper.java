@@ -241,11 +241,13 @@ public class RNCameraViewHelper {
 
   public static void emitVideoAnalyseDetectedEvent(
           ViewGroup view,
-          SparseArray<Recognition> boxes
+          SparseArray<Recognition> boxes,
+          long timeStamp
   ) {
     VideoAnalyseDetectEvent event = VideoAnalyseDetectEvent.obtain(
             view.getId(),
-            boxes
+            boxes,
+            timeStamp
     );
 
     ReactContext reactContext = (ReactContext) view.getContext();
